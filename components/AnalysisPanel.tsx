@@ -17,7 +17,6 @@ interface Props {
   analysisPhase: AnalysisPhase;
   analysisStep: number;
   data: AnalysisData;
-  onStart: () => void;
   thread: { q: string; a: string | null }[];
   onSend: (q: string) => void;
   askPending: boolean;
@@ -112,8 +111,7 @@ function AskBox({ data, thread, onSend, pending }: { data: AnalysisData; thread:
   );
 }
 
-export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data, onStart, thread, onSend, askPending }: Props) {
-  const canStart = phase === 'recognized' && analysisPhase === 'none';
+export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data, thread, onSend, askPending }: Props) {
   const started = analysisPhase !== 'none';
 
   return (
@@ -125,7 +123,7 @@ export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data
         </span>
         <div className="actions">
           {!started ? (
-            <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }} disabled={!canStart} onClick={onStart}>开始分析</button>
+            <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }} disabled>等待字幕</button>
           ) : analysisPhase === 'analyzing' ? (
             <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }} disabled>
               <span className="spinner" /> 分析中
@@ -142,7 +140,7 @@ export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><path d="M12 3l1.912 5.813H20l-4.956 3.562L16.912 18 12 14.438 7.088 18l1.868-5.625L4 8.813h6.088L12 3z" /></svg>
           </div>
           <div className="et">{phase === 'recognized' ? '字幕已就绪' : '等待字幕识别完成'}</div>
-          <div className="es">{phase === 'recognized' ? '点击右上角「开始分析」，AI 将提取卖点、给视频打分并总结话术。' : '识别完成后即可对达人话术进行卖点、评分与摘要分析。'}</div>
+          <div className="es">{phase === 'recognized' ? 'AI 将自动提取卖点、给视频打分并总结话术。' : '识别完成后即可对达人话术进行卖点、评分与摘要分析。'}</div>
         </div>
       ) : (
         <div className="ai-body">

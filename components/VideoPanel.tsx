@@ -7,17 +7,25 @@ type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 interface Subtitle {
   t: number;
   es: string;
-  en: string;
+  zh: string;
 }
 
 interface Props {
   phase: Phase;
   sub: Subtitle | null;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  videoUrl: string;
+  coverUrl: string;
   currentTime: number;
   duration: number;
   playing: boolean;
   onTogglePlay: () => void;
   onSeek: (sec: number) => void;
+  onLoadedMetadata: () => void;
+  onTimeUpdate: () => void;
+  onEnded: () => void;
+  onPlayStateChange: (playing: boolean) => void;
+  onVideoError: () => void;
 }
 
 function fmtTime(sec: number) {
@@ -25,7 +33,23 @@ function fmtTime(sec: number) {
   return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
 }
 
-export default function VideoPanel({ phase, sub, currentTime, duration, playing, onTogglePlay, onSeek }: Props) {
+export default function VideoPanel({
+  phase,
+  sub,
+  videoRef,
+  videoUrl,
+  coverUrl,
+  currentTime,
+  duration,
+  playing,
+  onTogglePlay,
+  onSeek,
+  onLoadedMetadata,
+  onTimeUpdate,
+  onEnded,
+  onPlayStateChange,
+  onVideoError,
+}: Props) {
   const loaded = phase === 'loaded' || phase === 'recognizing' || phase === 'recognized';
   const trackRef = useRef<HTMLDivElement>(null);
   const pct = duration ? (currentTime / duration) * 100 : 0;
@@ -64,12 +88,22 @@ export default function VideoPanel({ phase, sub, currentTime, duration, playing,
             )}
           </div>
 
-          <div className={`video-scene${loaded ? ' on' : ''}`}>
-            <div className="sky" />
-            <div className="subject" />
-            <div className="product" />
-            <div className="tag">product · 9:16</div>
-          </div>
+          {videoUrl && (
+            <video
+              ref={videoRef}
+              className="video-el"
+              src={videoUrl}
+              poster={coverUrl || undefined}
+              crossOrigin="anonymous"
+              playsInline
+              onLoadedMetadata={onLoadedMetadata}
+              onTimeUpdate={onTimeUpdate}
+              onPlay={() => onPlayStateChange(true)}
+              onPause={() => onPlayStateChange(false)}
+              onEnded={onEnded}
+              onError={onVideoError}
+            />
+          )}
 
           <div className={`video-rail${loaded ? ' on' : ''}`}>
             <div className="r">
@@ -93,7 +127,7 @@ export default function VideoPanel({ phase, sub, currentTime, duration, playing,
           {loaded && sub && (
             <div className="sub-overlay">
               <div className="src fade-in" key={'s' + sub.t}>{sub.es}</div>
-              <div className="dst fade-in" key={'d' + sub.t}>{sub.en}</div>
+              <div className="dst fade-in" key={'d' + sub.t}>{sub.zh}</div>
             </div>
           )}
         </div>

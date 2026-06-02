@@ -8,7 +8,7 @@ type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 interface Subtitle {
   t: number;
   es: string;
-  en: string;
+  zh: string;
 }
 
 interface Props {
@@ -63,7 +63,7 @@ export default function SubtitlePanel({ phase, subtitles, recognizedCount, activ
             </svg>
           </div>
           <div className="et">字幕将在这里出现</div>
-          <div className="es">解析视频后，西语语音将被实时识别并翻译成英文。</div>
+          <div className="es">解析视频后，西语语音将被实时识别并翻译成中文。</div>
         </div>
       ) : (
         <div className="sub-list" ref={listRef}>
@@ -77,7 +77,7 @@ export default function SubtitlePanel({ phase, subtitles, recognizedCount, activ
               <span className="ts">{fmtTime(s.t)}</span>
               <div className="lines">
                 <div className="src">{s.es}</div>
-                <div className="dst">{s.en}</div>
+                <div className="dst">{s.zh}</div>
               </div>
             </div>
           ))}
