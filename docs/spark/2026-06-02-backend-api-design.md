@@ -12,7 +12,7 @@
 app/api/
   auth/route.ts          POST /api/auth       — 登录，返回 JWT
   tikhub/route.ts        POST /api/tikhub     — 解析 TikTok 链接
-  transcribe/route.ts    POST /api/transcribe — 双语字幕（并行 Whisper）
+  transcribe/route.ts    POST /api/transcribe — 双语字幕（Whisper 转录 + LLM 中文翻译）
   analyze/route.ts       POST /api/analyze    — AI 内容分析
   chat/route.ts          POST /api/chat       — 追问 AI
 lib/
@@ -44,6 +44,12 @@ lib/
 ```ts
 export function signJWT(): string
 export function verifyJWT(req: Request): void  // 校验失败 throw，route catch 后返回 401
+```
+
+**JWT 库：必须使用 `jose`**，不可用 `jsonwebtoken`。Next.js App Router 运行在 Edge Runtime，`jsonwebtoken` 依赖 Node.js crypto 模块，会在运行时报错。`jose` 是纯 Web Crypto API 实现，兼容 Edge Runtime。
+
+```bash
+pnpm add jose
 ```
 
 ### 统一错误格式
@@ -92,6 +98,14 @@ function checkRateLimit(ip: string): boolean {
   entry.count++;
   return true;
 }
+```
+
+**App Router 中获取客户端 IP：** `Request` 对象没有 `socket.remoteAddress`，从 Header 取：
+
+```ts
+const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
+         ?? req.headers.get('x-real-ip')
+         ?? 'unknown';
 ```
 
 **Errors:**
@@ -181,6 +195,14 @@ Header: Authorization: Bearer ${TIKHUB_API_KEY}
 - 第二步：LLM 中文翻译（替换原 Whisper translate，因 Whisper 只能译成英文）
   - 提取所有 segment 文本 → 一次 LLM 调用批量翻译成中文 → 返回等长字符串数组
   - 使用 `ANALYSIS_BASE_URL` + `ANALYSIS_API_KEY`（与 `/api/analyze` 共用同一 AI provider）
+  - **翻译 Prompt：**
+    ```
+    System: 你是一个翻译助手，只输出翻译结果，不解释、不补充。
+
+    User: 将以下西语句子逐条翻译成中文，返回等长 JSON 字符串数组，不要输出任何其他内容。
+    ["sentence1", "sentence2", ...]
+    ```
+    返回格式：`["译文1", "译文2", ...]`，后端 `JSON.parse` 后按 index zip
 - 翻译失败处理（inline retry）：
   1. 翻译 rejected → 原地重试一次
   2. 重试仍失败 → `zh` 字段用空字符串补位，原文照常返回
@@ -354,6 +376,11 @@ User:
 - 不存在 → 跳转 `/login`
 - 存在 → 所有 fetch 带 `Authorization: Bearer <token>` header
 - 任意 API 返回 `401` → 清除 token，跳转 `/login`
+
+**`app/login/page.tsx`（需新建）：**
+- 表单：密码输入框 + 登录按钮
+- 提交时 `POST /api/auth`，成功后将 `token` 写入 `localStorage('tt_token')`，跳转 `/`
+- 失败时显示「密码错误」提示，429 时显示「尝试次数过多，请稍后再试」
 
 ---
 
