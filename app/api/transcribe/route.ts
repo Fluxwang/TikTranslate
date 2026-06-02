@@ -14,6 +14,15 @@ type OpenRouterTranscriptionResponse = {
   segments?: WhisperSegment[];
 };
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  es: '西班牙语',
+  en: '英语',
+  pt: '葡萄牙语',
+  id: '印尼语',
+  vi: '越南语',
+  th: '泰语',
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
@@ -57,12 +66,18 @@ function getSegments(payload: OpenRouterTranscriptionResponse): WhisperSegment[]
   return text ? [{ start: 0, text }] : [];
 }
 
-async function translateSegments(texts: string[]) {
+function normalizeSourceLang(value: FormDataEntryValue | null) {
+  const lang = String(value ?? 'es').trim().toLowerCase();
+  return LANGUAGE_LABELS[lang] ? lang : 'es';
+}
+
+async function translateSegments(texts: string[], sourceLang: string) {
   if (texts.length === 0) return [];
 
   const baseUrl = process.env.ANALYSIS_BASE_URL;
   const apiKey = process.env.ANALYSIS_API_KEY;
   const model = process.env.ANALYSIS_MODEL ?? 'claude-sonnet-4-6';
+  const sourceLabel = LANGUAGE_LABELS[sourceLang] ?? '原始语言';
 
   async function once() {
     const res = await fetch(`${baseUrl}/chat/completions`, {
@@ -77,7 +92,7 @@ async function translateSegments(texts: string[]) {
           { role: 'system', content: '你是一个翻译助手，只输出翻译结果，不解释、不补充。' },
           {
             role: 'user',
-            content: `将以下西语句子逐条翻译成中文，返回等长 JSON 字符串数组，不要输出任何其他内容。\n${JSON.stringify(texts)}`,
+            content: `将以下${sourceLabel}句子逐条翻译成中文，返回等长 JSON 字符串数组，不要输出任何其他内容。\n${JSON.stringify(texts)}`,
           },
         ],
       }),
@@ -136,7 +151,7 @@ export async function POST(req: Request) {
   }
 
   const startOffset = Number.parseFloat(String(form.get('startOffset') ?? '0'));
-  const sourceLang = String(form.get('sourceLang') ?? 'es').trim() || 'es';
+  const sourceLang = normalizeSourceLang(form.get('sourceLang'));
 
   const baseUrl = process.env.WHISPER_BASE_URL ?? 'https://openrouter.ai/api/v1';
   let upstream: Response;
@@ -169,7 +184,7 @@ export async function POST(req: Request) {
   const payload = await upstream.json() as OpenRouterTranscriptionResponse;
   const rawSegments = getSegments(payload);
   const texts = rawSegments.map((seg) => (typeof seg.text === 'string' ? seg.text.trim() : '')).filter(Boolean);
-  const translations = await translateSegments(texts);
+  const translations = await translateSegments(texts, sourceLang);
   let translationIndex = 0;
 
   return json({

@@ -58,7 +58,7 @@ html, body {
 }
 
 button { font-family: inherit; cursor: pointer; }
-input, textarea { font-family: inherit; }
+input, textarea, select { font-family: inherit; }
 
 /* ---- APP SHELL ---- */
 .app {
@@ -136,6 +136,30 @@ input, textarea { font-family: inherit; }
   letter-spacing: 0.03em; text-transform: lowercase;
 }
 .topbar-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.lang-select {
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: var(--border-radius-md);
+  background: var(--color-background-primary);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.lang-select select {
+  width: 82px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: 12px;
+}
+.lang-select:has(select:disabled) {
+  opacity: 0.55;
+}
 .icon-btn {
   width: 30px; height: 30px; display: grid; place-items: center;
   border-radius: var(--border-radius-md); background: transparent;

@@ -72,7 +72,7 @@ export default function SubtitlePanel({
             </svg>
           </div>
           <div className="et">字幕将在这里出现</div>
-          <div className="es">解析视频后，西语语音将被实时识别并翻译成中文。</div>
+          <div className="es">解析视频后，原始语音将被实时识别并翻译成中文。</div>
         </div>
       ) : (
         <div className="sub-list" ref={listRef}>

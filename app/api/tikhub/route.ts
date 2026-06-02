@@ -8,6 +8,16 @@ function error(status: number, code: string, detail?: string) {
   return json(detail ? { error: code, detail } : { error: code }, status);
 }
 
+function isHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 function isTikTokUrl(value: unknown): value is string {
   if (typeof value !== 'string' || value.trim().length === 0) return false;
   try {
@@ -19,6 +29,16 @@ function isTikTokUrl(value: unknown): value is string {
   } catch {
     return false;
   }
+}
+
+function resolveDebugVideoAlias(value: unknown) {
+  if (typeof value !== 'string' || value.trim().toLowerCase() !== 'test1') return null;
+
+  return {
+    alias: 'test1',
+    envName: 'TEST1_VIDEO_URL',
+    videoUrl: process.env.TEST1_VIDEO_URL?.trim() ?? '',
+  };
 }
 
 function getAtPath(data: unknown, path: string[]) {
@@ -42,6 +62,23 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return error(400, 'invalid_url');
+  }
+
+  const debugVideo = resolveDebugVideoAlias(body.url);
+  if (debugVideo) {
+    if (!debugVideo.videoUrl) {
+      return error(500, 'debug_video_url_missing', `Set ${debugVideo.envName}`);
+    }
+    if (!isHttpUrl(debugVideo.videoUrl)) {
+      return error(500, 'debug_video_url_invalid', `${debugVideo.envName} must be an HTTP or HTTPS URL`);
+    }
+
+    return json({
+      videoUrls: [debugVideo.videoUrl],
+      author: `@${debugVideo.alias}`,
+      durationSec: 0,
+      coverUrl: '',
+    });
   }
 
   if (!isTikTokUrl(body.url)) {

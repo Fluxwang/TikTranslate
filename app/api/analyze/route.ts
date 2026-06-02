@@ -8,6 +8,15 @@ type Subtitle = {
   zh: string;
 };
 
+const LANGUAGE_LABELS: Record<string, string> = {
+  es: '西班牙语',
+  en: '英语',
+  pt: '葡萄牙语',
+  id: '印尼语',
+  vi: '越南语',
+  th: '泰语',
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
@@ -39,6 +48,11 @@ function parseAnalysis(content: string) {
   }
 }
 
+function normalizeSourceLang(value: unknown) {
+  const lang = typeof value === 'string' ? value.trim().toLowerCase() : 'es';
+  return LANGUAGE_LABELS[lang] ? lang : 'es';
+}
+
 export async function POST(req: Request) {
   try {
     await verifyJWT(req);
@@ -46,7 +60,7 @@ export async function POST(req: Request) {
     return error(401, 'unauthorized', err instanceof Error ? err.message : undefined);
   }
 
-  let body: { subtitles?: unknown };
+  let body: { subtitles?: unknown; sourceLang?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -58,6 +72,8 @@ export async function POST(req: Request) {
   }
 
   const subtitles = body.subtitles as Subtitle[];
+  const sourceLang = normalizeSourceLang(body.sourceLang);
+  const sourceLabel = LANGUAGE_LABELS[sourceLang] ?? '原始语言';
   const transcript = subtitles
     .map((s) => `[${s.t}] ${s.es} / ${s.zh}`)
     .join('\n');
@@ -78,7 +94,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'system',
-            content: '你是一位专业的 TikTok 带货话术分析师，服务于国内电商从业者。用户会提供一段 TikTok 视频的完整字幕（西语原文 + 中文翻译），你需要分析达人的带货话术并返回结构化 JSON，不要输出任何 JSON 以外的内容。',
+            content: `你是一位专业的 TikTok 带货话术分析师，服务于国内电商从业者。用户会提供一段 TikTok 视频的完整字幕（${sourceLabel}原文 + 中文翻译），你需要分析达人的带货话术并返回结构化 JSON，不要输出任何 JSON 以外的内容。`,
           },
           {
             role: 'user',
