@@ -9,12 +9,52 @@ type WhisperSegment = {
   text?: string;
 };
 
+type OpenRouterTranscriptionResponse = {
+  text?: string;
+  segments?: WhisperSegment[];
+};
+
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
 
 function error(status: number, code: string, detail?: string) {
   return json(detail ? { error: code, detail } : { error: code }, status);
+}
+
+function getRequiredEnv(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+function getAudioFormat(audio: Blob) {
+  const mimeType = audio.type.split(';')[0].trim().toLowerCase();
+  const subtype = mimeType.split('/')[1];
+
+  if (!subtype) return 'webm';
+  if (subtype === 'mpeg') return 'mp3';
+  if (subtype === 'mp4') return 'm4a';
+  return subtype.replace(/^x-/, '');
+}
+
+async function blobToBase64(blob: Blob) {
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  return buffer.toString('base64');
+}
+
+async function readUpstreamError(res: Response) {
+  const text = await res.text().catch(() => '');
+  return text ? `Whisper status ${res.status}: ${text.slice(0, 1000)}` : `Whisper status ${res.status}`;
+}
+
+function getSegments(payload: OpenRouterTranscriptionResponse): WhisperSegment[] {
+  if (Array.isArray(payload.segments)) return payload.segments;
+
+  const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+  return text ? [{ start: 0, text }] : [];
 }
 
 async function translateSegments(texts: string[]) {
@@ -98,23 +138,24 @@ export async function POST(req: Request) {
   const startOffset = Number.parseFloat(String(form.get('startOffset') ?? '0'));
   const sourceLang = String(form.get('sourceLang') ?? 'es').trim() || 'es';
 
-  const whisperForm = new FormData();
-  whisperForm.set('audio', audio, audio instanceof File ? audio.name : 'chunk.webm');
-  whisperForm.set('file', audio, audio instanceof File ? audio.name : 'chunk.webm');
-  whisperForm.set('model', 'openai/whisper-large-v3');
-  whisperForm.set('task', 'transcribe');
-  whisperForm.set('language', sourceLang);
-  whisperForm.set('response_format', 'verbose_json');
-
   const baseUrl = process.env.WHISPER_BASE_URL ?? 'https://openrouter.ai/api/v1';
   let upstream: Response;
   try {
+    const apiKey = getRequiredEnv('OPENROUTER_API_KEY');
     upstream = await fetch(`${baseUrl}/audio/transcriptions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY ?? ''}`,
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      body: whisperForm,
+      body: JSON.stringify({
+        model: process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3',
+        input_audio: {
+          data: await blobToBase64(audio),
+          format: getAudioFormat(audio),
+        },
+        language: sourceLang,
+      }),
       cache: 'no-store',
     });
   } catch (err) {
@@ -122,11 +163,11 @@ export async function POST(req: Request) {
   }
 
   if (!upstream.ok) {
-    return error(502, 'whisper_failed', `Whisper status ${upstream.status}`);
+    return error(502, 'whisper_failed', await readUpstreamError(upstream));
   }
 
-  const payload = await upstream.json();
-  const rawSegments = Array.isArray(payload?.segments) ? payload.segments as WhisperSegment[] : [];
+  const payload = await upstream.json() as OpenRouterTranscriptionResponse;
+  const rawSegments = getSegments(payload);
   const texts = rawSegments.map((seg) => (typeof seg.text === 'string' ? seg.text.trim() : '')).filter(Boolean);
   const translations = await translateSegments(texts);
   let translationIndex = 0;

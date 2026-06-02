@@ -3,7 +3,7 @@
 import { useState } from 'react';
 
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
-type AnalysisPhase = 'none' | 'analyzing' | 'done';
+type AnalysisPhase = 'none' | 'analyzing' | 'done' | 'failed';
 
 interface AnalysisData {
   sellingPoints: readonly string[];
@@ -16,6 +16,7 @@ interface Props {
   phase: Phase;
   analysisPhase: AnalysisPhase;
   analysisStep: number;
+  analysisError: string;
   data: AnalysisData;
   thread: { q: string; a: string | null }[];
   onSend: (q: string) => void;
@@ -111,7 +112,7 @@ function AskBox({ data, thread, onSend, pending }: { data: AnalysisData; thread:
   );
 }
 
-export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data, thread, onSend, askPending }: Props) {
+export default function AnalysisPanel({ phase, analysisPhase, analysisStep, analysisError, data, thread, onSend, askPending }: Props) {
   const started = analysisPhase !== 'none';
 
   return (
@@ -128,6 +129,8 @@ export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data
             <button className="btn btn-ghost" style={{ height: 26, padding: '0 10px', fontSize: 11 }} disabled>
               <span className="spinner" /> 分析中
             </button>
+          ) : analysisPhase === 'failed' ? (
+            <span className="beta" style={{ textTransform: 'none' }}>失败</span>
           ) : (
             <span className="beta" style={{ textTransform: 'none' }}>已完成</span>
           )}
@@ -141,6 +144,14 @@ export default function AnalysisPanel({ phase, analysisPhase, analysisStep, data
           </div>
           <div className="et">{phase === 'recognized' ? '字幕已就绪' : '等待字幕识别完成'}</div>
           <div className="es">{phase === 'recognized' ? 'AI 将自动提取卖点、给视频打分并总结话术。' : '识别完成后即可对达人话术进行卖点、评分与摘要分析。'}</div>
+        </div>
+      ) : analysisPhase === 'failed' ? (
+        <div className="empty">
+          <div className="ei">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+          </div>
+          <div className="et">分析失败</div>
+          <div className="es">{analysisError || '请检查 ANALYSIS_BASE_URL、ANALYSIS_API_KEY 和模型配置。'}</div>
         </div>
       ) : (
         <div className="ai-body">

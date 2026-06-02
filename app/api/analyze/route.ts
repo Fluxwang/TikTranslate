@@ -16,6 +16,19 @@ function error(status: number, code: string, detail?: string) {
   return json(detail ? { error: code, detail } : { error: code }, status);
 }
 
+function getRequiredEnv(name: string) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+async function readUpstreamError(res: Response) {
+  const text = await res.text().catch(() => '');
+  return text ? `LLM status ${res.status}: ${text.slice(0, 1000)}` : `LLM status ${res.status}`;
+}
+
 function parseAnalysis(content: string) {
   try {
     return JSON.parse(content);
@@ -51,10 +64,13 @@ export async function POST(req: Request) {
 
   let res: Response;
   try {
-    res = await fetch(`${process.env.ANALYSIS_BASE_URL}/chat/completions`, {
+    const baseUrl = getRequiredEnv('ANALYSIS_BASE_URL').replace(/\/$/, '');
+    const apiKey = getRequiredEnv('ANALYSIS_API_KEY');
+
+    res = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.ANALYSIS_API_KEY ?? ''}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -77,7 +93,7 @@ export async function POST(req: Request) {
   }
 
   if (!res.ok) {
-    return error(502, 'llm_failed', `LLM status ${res.status}`);
+    return error(502, 'llm_failed', await readUpstreamError(res));
   }
 
   const data = await res.json();

@@ -18,9 +18,18 @@ interface Props {
   activeIdx: number;
   recogClock: number;
   onSeek: (sec: number) => void;
+  onStartRecognition: () => void;
 }
 
-export default function SubtitlePanel({ phase, subtitles, recognizedCount, activeIdx, recogClock, onSeek }: Props) {
+export default function SubtitlePanel({
+  phase,
+  subtitles,
+  recognizedCount,
+  activeIdx,
+  recogClock,
+  onSeek,
+  onStartRecognition,
+}: Props) {
   const idle = phase === 'idle' || phase === 'parsing';
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
@@ -33,7 +42,7 @@ export default function SubtitlePanel({ phase, subtitles, recognizedCount, activ
   }, [activeIdx]);
 
   const total = subtitles.length;
-  const skeletonCount = phase === 'recognized' ? 0 : Math.min(3, total - recognizedCount);
+  const skeletonCount = phase === 'recognizing' ? Math.min(3, total - recognizedCount) : 0;
 
   return (
     <section className="col">
@@ -67,6 +76,25 @@ export default function SubtitlePanel({ phase, subtitles, recognizedCount, activ
         </div>
       ) : (
         <div className="sub-list" ref={listRef}>
+          {total === 0 && (
+            <div className="empty">
+              <div className="ei">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              <div className="et">
+                {phase === 'recognized' ? '未识别到字幕' : phase === 'loaded' ? '待识别' : '等待第一段字幕'}
+              </div>
+              <div className="es">
+                {phase === 'recognized'
+                  ? '转写接口已结束，但没有返回可显示的文本。'
+                  : phase === 'loaded'
+                    ? '点击开始识别后，将锁定播放器并从头生成字幕。'
+                    : '视频播放后会按音频分片逐段生成字幕。'}
+              </div>
+            </div>
+          )}
           {subtitles.slice(0, recognizedCount).map((s, i) => (
             <div
               key={i}
@@ -102,12 +130,23 @@ export default function SubtitlePanel({ phase, subtitles, recognizedCount, activ
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="13" height="13">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
+              <span className="sub-status-spacer" />
+              <button className="sub-action" disabled>已完成</button>
+            </>
+          ) : phase === 'loaded' ? (
+            <>
+              <span className="dot ready" />
+              待识别
+              <span className="sub-status-spacer" />
+              <button className="sub-action" onClick={onStartRecognition}>开始识别</button>
             </>
           ) : (
             <>
               <span className="dot live" />
               识别中...
               <span className="mono">{fmtTime(recogClock)}</span>
+              <span className="sub-status-spacer" />
+              <button className="sub-action" disabled>识别中</button>
             </>
           )}
         </div>

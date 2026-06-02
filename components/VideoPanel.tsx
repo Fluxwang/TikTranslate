@@ -26,6 +26,7 @@ interface Props {
   onEnded: () => void;
   onPlayStateChange: (playing: boolean) => void;
   onVideoError: () => void;
+  locked: boolean;
 }
 
 function fmtTime(sec: number) {
@@ -49,12 +50,14 @@ export default function VideoPanel({
   onEnded,
   onPlayStateChange,
   onVideoError,
+  locked,
 }: Props) {
   const loaded = phase === 'loaded' || phase === 'recognizing' || phase === 'recognized';
   const trackRef = useRef<HTMLDivElement>(null);
   const pct = duration ? (currentTime / duration) * 100 : 0;
 
   const seekFromEvent = (e: React.MouseEvent) => {
+    if (locked) return;
     const el = trackRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
@@ -134,7 +137,7 @@ export default function VideoPanel({
       </div>
 
       <div className="video-controls">
-        <button className={`play${loaded ? '' : ' disabled'}`} disabled={!loaded} onClick={onTogglePlay}>
+        <button className={`play${loaded && !locked ? '' : ' disabled'}`} disabled={!loaded || locked} onClick={onTogglePlay}>
           {playing ? (
             <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
               <rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" />
@@ -145,7 +148,7 @@ export default function VideoPanel({
             </svg>
           )}
         </button>
-        <div className="track" ref={trackRef} onClick={seekFromEvent}>
+        <div className={`track${locked ? ' locked' : ''}`} ref={trackRef} onClick={seekFromEvent}>
           <div className="fill" style={{ width: pct + '%' }} />
           <div className="knob" style={{ left: pct + '%' }} />
         </div>

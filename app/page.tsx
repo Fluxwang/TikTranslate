@@ -8,7 +8,7 @@ import SubtitlePanel from '@/components/SubtitlePanel';
 import AnalysisPanel from '@/components/AnalysisPanel';
 
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
-type AnalysisPhase = 'none' | 'analyzing' | 'done';
+type AnalysisPhase = 'none' | 'analyzing' | 'done' | 'failed';
 
 type Subtitle = {
   t: number;
@@ -45,6 +45,8 @@ export default function Home() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recorderTimerRef = useRef<number | null>(null);
+  const audioStreamRef = useRef<MediaStream | null>(null);
   const chunkStartRef = useRef(0);
   const endedRef = useRef(false);
 
@@ -61,6 +63,7 @@ export default function Home() {
   const [transcribePending, setTranscribePending] = useState(0);
   const [recorderFinalizing, setRecorderFinalizing] = useState(false);
   const [analysisPhase, setAnalysisPhase] = useState<AnalysisPhase>('none');
+  const [analysisError, setAnalysisError] = useState('');
   const [analysisStep, setAnalysisStep] = useState(0);
   const [analysisData, setAnalysisData] = useState<AnalysisData>(EMPTY_ANALYSIS);
   const [thread, setThread] = useState<{ q: string; a: string | null }[]>([]);
@@ -91,14 +94,23 @@ export default function Home() {
   }, [router]);
 
   const stopRecorder = useCallback((finalizing = false) => {
+    if (recorderTimerRef.current != null) {
+      window.clearInterval(recorderTimerRef.current);
+      recorderTimerRef.current = null;
+    }
+
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
       if (finalizing) setRecorderFinalizing(true);
+      if (recorder.state === 'paused') {
+        recorder.resume();
+      }
       recorder.stop();
     } else if (finalizing) {
       setRecorderFinalizing(false);
     }
     mediaRecorderRef.current = null;
+    audioStreamRef.current = null;
   }, []);
 
   const sendAudioChunk = useCallback(async (blob: Blob, startOffset: number) => {
@@ -129,26 +141,59 @@ export default function Home() {
 
   const startRecorder = useCallback(() => {
     const video = videoRef.current;
-    if (!video || mediaRecorderRef.current) return;
+    if (!video || mediaRecorderRef.current || recorderTimerRef.current != null) return;
 
-    const captureStream = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
-    const stream = captureStream?.call(video);
-    if (!stream || stream.getAudioTracks().length === 0) return;
+    const getAudioStream = () => {
+      if (audioStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live')) {
+        return audioStreamRef.current;
+      }
 
-    const audioOnly = new MediaStream(stream.getAudioTracks());
-    const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
-    const recorder = mimeType ? new MediaRecorder(audioOnly, { mimeType }) : new MediaRecorder(audioOnly);
-    chunkStartRef.current = video.currentTime;
+      const captureStream = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
+      const stream = captureStream?.call(video);
+      if (!stream || stream.getAudioTracks().length === 0) return null;
 
-    recorder.ondataavailable = (event) => {
-      const startOffset = chunkStartRef.current;
-      chunkStartRef.current = video.currentTime;
-      void sendAudioChunk(event.data, startOffset);
+      audioStreamRef.current = new MediaStream(stream.getAudioTracks());
+      return audioStreamRef.current;
     };
-    recorder.onstop = () => setRecorderFinalizing(false);
-    recorder.start(15_000);
-    mediaRecorderRef.current = recorder;
-    setPhase('recognizing');
+
+    const startChunkRecorder = () => {
+      const audioOnly = getAudioStream();
+      if (!audioOnly || mediaRecorderRef.current) return;
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+      const recorder = mimeType ? new MediaRecorder(audioOnly, { mimeType }) : new MediaRecorder(audioOnly);
+      chunkStartRef.current = video.currentTime;
+
+      recorder.ondataavailable = (event) => {
+        const startOffset = chunkStartRef.current;
+        chunkStartRef.current = video.currentTime;
+        void sendAudioChunk(event.data, startOffset);
+      };
+      recorder.onstop = () => {
+        if (mediaRecorderRef.current === recorder) {
+          mediaRecorderRef.current = null;
+        }
+        setRecorderFinalizing(false);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setPhase('recognizing');
+    };
+
+    startChunkRecorder();
+    recorderTimerRef.current = window.setInterval(() => {
+      const recorder = mediaRecorderRef.current;
+      const currentVideo = videoRef.current;
+      if (!currentVideo || currentVideo.paused || currentVideo.ended || recorder?.state !== 'recording') return;
+
+      recorder.stop();
+      mediaRecorderRef.current = null;
+      window.setTimeout(startChunkRecorder, 0);
+    }, 15_000);
   }, [sendAudioChunk]);
 
   const onParse = async () => {
@@ -163,6 +208,7 @@ export default function Home() {
     setTranscribePending(0);
     setRecorderFinalizing(false);
     setAnalysisPhase('none');
+    setAnalysisError('');
     setAnalysisStep(0);
     setAnalysisData(EMPTY_ANALYSIS);
     setThread([]);
@@ -193,12 +239,11 @@ export default function Home() {
     const video = videoRef.current;
     if (!videoUrl || !video) return;
     video.load();
-    void video.play().catch(() => setPlaying(false));
   }, [videoUrl]);
 
   const onTogglePlay = () => {
     const video = videoRef.current;
-    if (!video || !videoUrl) return;
+    if (!video || !videoUrl || phase === 'recognizing') return;
     if (video.ended || (duration > 0 && video.currentTime >= duration)) {
       video.currentTime = 0;
     }
@@ -208,7 +253,7 @@ export default function Home() {
 
   const onSeek = (sec: number) => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || phase === 'recognizing') return;
     video.currentTime = Math.min(duration || video.duration || sec, Math.max(0, sec));
     void video.play();
   };
@@ -219,31 +264,76 @@ export default function Home() {
     setDuration(Number.isFinite(video.duration) ? video.duration : duration);
   };
 
+  const finalizePlayback = useCallback(() => {
+    const video = videoRef.current;
+    if (video) {
+      setCurrentTime(Number.isFinite(video.duration) ? video.duration : video.currentTime);
+    }
+    setPlaying(false);
+    if (endedRef.current) return;
+    endedRef.current = true;
+    stopRecorder(phase === 'recognizing');
+  }, [phase, stopRecorder]);
+
   const onTimeUpdate = () => {
     const video = videoRef.current;
     if (!video) return;
     setCurrentTime(video.currentTime);
+    if (Number.isFinite(video.duration) && video.duration > 0 && video.currentTime >= video.duration - 0.2) {
+      finalizePlayback();
+    }
   };
 
   const onPlayStateChange = (nextPlaying: boolean) => {
+    const video = videoRef.current;
     setPlaying(nextPlaying);
     const recorder = mediaRecorderRef.current;
 
     if (nextPlaying) {
-      if (!recorder) {
-        startRecorder();
-      } else if (recorder.state === 'paused') {
+      if (endedRef.current) {
+        endedRef.current = false;
+      }
+      if (recorder?.state === 'paused') {
         recorder.resume();
       }
+    } else if (video?.ended || (duration > 0 && video && video.currentTime >= duration - 0.2)) {
+      finalizePlayback();
+    } else if (phase === 'recognizing' && video) {
+      void video.play().catch(() => undefined);
     } else if (recorder?.state === 'recording') {
       recorder.pause();
     }
   };
 
+  const onStartRecognition = async () => {
+    const video = videoRef.current;
+    if (!video || !videoUrl || phase !== 'loaded') return;
+
+    stopRecorder();
+    endedRef.current = false;
+    setSubtitles([]);
+    setTranscribePending(0);
+    setRecorderFinalizing(false);
+    setAnalysisPhase('none');
+    setAnalysisError('');
+    setAnalysisStep(0);
+    setAnalysisData(EMPTY_ANALYSIS);
+    setThread([]);
+    setCurrentTime(0);
+    video.currentTime = 0;
+    setPhase('recognizing');
+
+    try {
+      await video.play();
+      startRecorder();
+    } catch {
+      setPlaying(false);
+      setPhase('loaded');
+    }
+  };
+
   const onEnded = () => {
-    setPlaying(false);
-    endedRef.current = true;
-    stopRecorder(true);
+    finalizePlayback();
   };
 
   const onVideoError = () => {
@@ -254,7 +344,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!endedRef.current || transcribePending > 0 || recorderFinalizing) return;
-    if (phase === 'loaded' || phase === 'recognizing') {
+    if (phase === 'recognizing') {
       const timer = window.setTimeout(() => setPhase('recognized'), 0);
       return () => window.clearTimeout(timer);
     }
@@ -279,13 +369,16 @@ export default function Home() {
       });
 
       if (!res.ok) {
-        setAnalysisPhase('none');
+        const data = await res.json().catch(() => null) as { error?: string; detail?: string } | null;
+        setAnalysisError(data?.detail || data?.error || '分析接口请求失败');
+        setAnalysisPhase('failed');
         return;
       }
 
       const data = await res.json() as AnalysisData;
       setAnalysisData(data);
       setAnalysisStep(3);
+      setAnalysisError('');
       setAnalysisPhase('done');
     } finally {
       stepTimers.forEach(window.clearTimeout);
@@ -370,6 +463,7 @@ export default function Home() {
           onEnded={onEnded}
           onPlayStateChange={onPlayStateChange}
           onVideoError={onVideoError}
+          locked={phase === 'recognizing'}
         />
         <SubtitlePanel
           phase={phase}
@@ -378,11 +472,13 @@ export default function Home() {
           activeIdx={activeIdx}
           recogClock={currentTime}
           onSeek={onSeek}
+          onStartRecognition={onStartRecognition}
         />
         <AnalysisPanel
           phase={phase}
           analysisPhase={analysisPhase}
           analysisStep={analysisStep}
+          analysisError={analysisError}
           data={analysisData}
           thread={thread}
           onSend={onSend}
