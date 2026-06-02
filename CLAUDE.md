@@ -4,10 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
-## Rule
-
-Before you want to add the new feather, You have to take a look of file brief.md, you need to follow the brief.md step to finish the project feather
-
 ## Commands
 
 ```bash
