@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 type AnalysisPhase = 'none' | 'analyzing' | 'done' | 'failed';
@@ -22,6 +24,13 @@ interface Props {
   onSend: (q: string) => void;
   askPending: boolean;
 }
+
+const MD_COMPONENTS: Components = {
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noopener noreferrer">{children}</a>
+  ),
+  img: () => null,
+};
 
 function CardSkeleton({ lines }: { lines: number }) {
   return <div>{Array.from({ length: lines }).map((_, i) => <div className="sk-block" key={i} style={{ width: `${95 - i * 14}%` }} />)}</div>;
@@ -70,7 +79,15 @@ function AskBox({ data, thread, onSend, pending }: { data: AnalysisData; thread:
               <div className="ask-msg q">{m.q}</div>
               <div className="ask-msg a" style={{ marginTop: 4 }}>
                 <span className="who">AI</span>
-                {m.a == null ? <span className="spinner" style={{ display: 'inline-block', verticalAlign: 'middle' }} /> : m.a}
+                <div className="ask-msg-body">
+                  {m.a == null ? (
+                    <span className="spinner" style={{ display: 'inline-block' }} />
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+                      {m.a}
+                    </ReactMarkdown>
+                  )}
+                </div>
               </div>
             </div>
           ))}

@@ -458,8 +458,84 @@ input, textarea, select { font-family: inherit; }
 .ask-thread { display: flex; flex-direction: column; gap: 8px; }
 .ask-msg { font-size: 11px; line-height: 1.55; }
 .ask-msg.q { color: var(--color-text-primary); font-weight: 500; }
-.ask-msg.a { color: var(--color-text-secondary); }
-.ask-msg.a .who { color: var(--accent); font-weight: 500; margin-right: 5px; }
+.ask-msg.a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+.ask-msg.a .who { color: var(--accent); font-weight: 500; }
+.ask-msg-body p { margin: 0; }
+.ask-msg-body p + p { margin-top: 6px; }
+.ask-msg-body h1 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 6px 0 2px;
+}
+.ask-msg-body h2 {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 6px 0 2px;
+}
+.ask-msg-body h3 {
+  font-size: 11px;
+  font-weight: 600;
+  margin: 4px 0 2px;
+}
+.ask-msg-body strong { font-weight: 600; }
+.ask-msg-body em { font-style: italic; }
+.ask-msg-body code {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: var(--color-background-tertiary);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.ask-msg-body pre {
+  background: var(--color-background-tertiary);
+  padding: 8px 10px;
+  border-radius: var(--border-radius-sm);
+  overflow-x: auto;
+  margin: 4px 0;
+}
+.ask-msg-body pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+.ask-msg-body ul,
+.ask-msg-body ol {
+  padding-left: 16px;
+  margin: 4px 0;
+}
+.ask-msg-body li { margin: 2px 0; }
+.ask-msg-body blockquote {
+  border-left: 2px solid var(--color-border-secondary);
+  padding-left: 8px;
+  color: var(--color-text-tertiary);
+  margin: 4px 0;
+}
+.ask-msg-body a { color: var(--accent); }
+.ask-msg-body a:hover { text-decoration: underline; }
+.ask-msg-body table {
+  border-collapse: collapse;
+  font-size: 10px;
+  margin: 4px 0;
+}
+.ask-msg-body th,
+.ask-msg-body td {
+  border: 1px solid var(--color-border-tertiary);
+  padding: 3px 6px;
+}
+.ask-msg-body th {
+  font-weight: 600;
+  background: var(--color-background-secondary);
+}
+.ask-msg-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border-tertiary);
+  margin: 6px 0;
+}
 
 .sk-block {
   height: 9px; border-radius: 3px; margin-bottom: 6px;
