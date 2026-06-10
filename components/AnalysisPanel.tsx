@@ -114,7 +114,13 @@ const ICONS = {
   ),
 } as const satisfies Record<string, ReactNode>;
 
-function Icon({ name, size = 14 }: { name: keyof typeof ICONS; size?: number }) {
+function Icon({
+  name,
+  size = 14,
+}: {
+  name: keyof typeof ICONS;
+  size?: number;
+}) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -162,7 +168,13 @@ function LoadingTab() {
   );
 }
 
-function EmptyTab({ title, description }: { title: string; description: string }) {
+function EmptyTab({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
   return (
     <div className="ai-body">
       <div className="empty">
@@ -203,7 +215,9 @@ function OverviewTab({
       <div className="stat-grid">
         <div className="stat-card enter">
           <div className="cap">综合爆款评分</div>
-          <div className="big accent">{step >= 2 ? data.overall.score.toFixed(1) : "—"}</div>
+          <div className="big accent">
+            {step >= 2 ? data.overall.score.toFixed(1) : "—"}
+          </div>
           <div className="sub">{step >= 2 ? data.overall.label : " "}</div>
         </div>
         <div className="stat-card enter">
@@ -365,7 +379,13 @@ function ScriptsTab({ data }: { data: AnalysisData }) {
 /* ============================================================
    TAB 4 — 达人建议（核心功能）
    ============================================================ */
-function CreatorTab({ data, products }: { data: AnalysisData; products: Product[] }) {
+function CreatorTab({
+  data,
+  products,
+}: {
+  data: AnalysisData;
+  products: Product[];
+}) {
   const [productId, setProductId] = useState(products[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState("");
@@ -445,7 +465,10 @@ function CreatorTab({ data, products }: { data: AnalysisData; products: Product[
               <span className="ready">
                 <span className="dot" /> Ready to send
               </span>
-              <button className={`copy-btn${copied ? " copied" : ""}`} onClick={onCopy}>
+              <button
+                className={`copy-btn${copied ? " copied" : ""}`}
+                onClick={onCopy}
+              >
                 {copied ? (
                   <>
                     <Icon name="check" size={13} /> Copied
@@ -500,9 +523,15 @@ function AskTab({
                 <span className="who">AI</span>
                 <div className="ask-msg-body">
                   {m.a == null ? (
-                    <span className="spinner" style={{ display: "inline-block" }} />
+                    <span
+                      className="spinner"
+                      style={{ display: "inline-block" }}
+                    />
                   ) : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={MD_COMPONENTS}
+                    >
                       {m.a}
                     </ReactMarkdown>
                   )}
@@ -543,7 +572,10 @@ function AskTab({
               }
             }}
           />
-          <button className={`send${val.trim() ? " ready" : ""}`} onClick={() => submit()}>
+          <button
+            className={`send${val.trim() ? " ready" : ""}`}
+            onClick={() => submit()}
+          >
             <Icon name="send" />
           </button>
         </div>
@@ -555,12 +587,20 @@ function AskTab({
 /* ============================================================
    产品设置页（覆盖整个侧栏）
    ============================================================ */
-function ProductCard({ product, onSave }: { product: Product; onSave: (p: Product) => void }) {
+function ProductCard({
+  product,
+  onSave,
+}: {
+  product: Product;
+  onSave: (p: Product) => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(product);
 
-  const upd = (k: keyof Product) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const upd =
+    (k: keyof Product) =>
+    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
   const startEdit = () => {
     setForm(product);
     setEditing(true);
@@ -580,14 +620,25 @@ function ProductCard({ product, onSave }: { product: Product; onSave: (p: Produc
         <div className="prod-form">
           <div>
             <label className="field-label">Product name</label>
-            <input className="field-input" value={form.name} onChange={upd("name")} />
+            <input
+              className="field-input"
+              value={form.name}
+              onChange={upd("name")}
+            />
           </div>
           <div>
             <label className="field-label">Target audience</label>
-            <textarea className="field-area" rows={2} value={form.audience} onChange={upd("audience")} />
+            <textarea
+              className="field-area"
+              rows={2}
+              value={form.audience}
+              onChange={upd("audience")}
+            />
           </div>
           <div>
-            <label className="field-label">Core selling points (comma separated)</label>
+            <label className="field-label">
+              Core selling points (comma separated)
+            </label>
             <textarea
               className="field-area"
               rows={3}
@@ -597,7 +648,12 @@ function ProductCard({ product, onSave }: { product: Product; onSave: (p: Produc
           </div>
           <div>
             <label className="field-label">Key usage scenes</label>
-            <textarea className="field-area" rows={2} value={form.scene} onChange={upd("scene")} />
+            <textarea
+              className="field-area"
+              rows={2}
+              value={form.scene}
+              onChange={upd("scene")}
+            />
           </div>
           <div className="prod-actions">
             <button className="btn-sm primary" onClick={save}>
@@ -690,7 +746,11 @@ export default function AnalysisPanel({
   if (settings) {
     return (
       <section className="col">
-        <SettingsPage products={products} setProducts={setProducts} onClose={() => setSettings(false)} />
+        <SettingsPage
+          products={products}
+          setProducts={setProducts}
+          onClose={() => setSettings(false)}
+        />
       </section>
     );
   }
@@ -723,11 +783,18 @@ export default function AnalysisPanel({
               失败
             </span>
           ) : (
-            <span className="beta" style={{ textTransform: "none", whiteSpace: "nowrap" }}>
+            <span
+              className="beta"
+              style={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
               <Icon name="check" size={11} /> 已完成
             </span>
           )}
-          <button className="icon-btn gear" title="产品设置" onClick={() => setSettings(true)}>
+          <button
+            className="icon-btn gear"
+            title="产品设置"
+            onClick={() => setSettings(true)}
+          >
             <Icon name="settings" size={15} />
           </button>
         </div>
@@ -754,7 +821,8 @@ export default function AnalysisPanel({
           </div>
           <div className="et">分析失败</div>
           <div className="es">
-            {analysisError || "请检查 ANALYSIS_BASE_URL、ANALYSIS_API_KEY 和模型配置。"}
+            {analysisError ||
+              "请检查 ANALYSIS_BASE_URL、ANALYSIS_API_KEY 和模型配置。"}
           </div>
         </div>
       ) : (
@@ -771,12 +839,34 @@ export default function AnalysisPanel({
             ))}
           </div>
 
-          {tab === "overview" && <OverviewTab data={data} durationSec={durationSec} step={analysisStep} />}
-          {tab === "structure" && (done ? <StructureTab data={data} /> : <LoadingTab />)}
-          {tab === "scripts" && (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
-          {tab === "creator" && (done ? <CreatorTab data={data} products={products} /> : <LoadingTab />)}
+          {tab === "overview" && (
+            <OverviewTab
+              data={data}
+              durationSec={durationSec}
+              step={analysisStep}
+            />
+          )}
+          {tab === "structure" &&
+            (done ? <StructureTab data={data} /> : <LoadingTab />)}
+          {tab === "scripts" &&
+            (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
+          {tab === "creator" &&
+            (done ? (
+              <CreatorTab data={data} products={products} />
+            ) : (
+              <LoadingTab />
+            ))}
           {tab === "ask" &&
-            (done ? <AskTab data={data} thread={thread} onSend={onSend} pending={askPending} /> : <LoadingTab />)}
+            (done ? (
+              <AskTab
+                data={data}
+                thread={thread}
+                onSend={onSend}
+                pending={askPending}
+              />
+            ) : (
+              <LoadingTab />
+            ))}
         </>
       )}
     </section>
