@@ -6,39 +6,14 @@ import TopBar from '@/components/TopBar';
 import VideoPanel from '@/components/VideoPanel';
 import SubtitlePanel from '@/components/SubtitlePanel';
 import AnalysisPanel from '@/components/AnalysisPanel';
-
-type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
-type AnalysisPhase = 'none' | 'analyzing' | 'done' | 'failed';
-
-type Subtitle = {
-  t: number;
-  es: string;
-  zh: string;
-};
-
-type AnalysisData = {
-  sellingPoints: string[];
-  scores: { dim: string; val: number; pct: number }[];
-  summary: string;
-  suggestedQuestions: string[];
-};
+import { adaptAnalysis, EMPTY_ANALYSIS, loadProducts, saveProducts } from '@/lib/analysis';
+import type { AnalysisData, AnalysisPhase, AnalyzeResponse, Phase, Product, Subtitle } from '@/lib/types';
 
 type TikHubResponse = {
   videoUrls: string[];
   author: string;
   durationSec: number;
   coverUrl: string;
-};
-
-const EMPTY_ANALYSIS: AnalysisData = {
-  sellingPoints: [],
-  scores: [
-    { dim: '说服力', val: 0, pct: 0 },
-    { dim: '钩子强度', val: 0, pct: 0 },
-    { dim: '爆款潜力', val: 0, pct: 0 },
-  ],
-  summary: '',
-  suggestedQuestions: [],
 };
 
 export default function Home() {
@@ -69,12 +44,17 @@ export default function Home() {
   const [analysisData, setAnalysisData] = useState<AnalysisData>(EMPTY_ANALYSIS);
   const [thread, setThread] = useState<{ q: string; a: string | null }[]>([]);
   const [askPending, setAskPending] = useState(false);
+  const [products, setProducts] = useState<Product[]>(() => loadProducts());
 
   const videoUrl = videoUrls[videoIndex] ?? '';
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    saveProducts(products);
+  }, [products]);
 
   useEffect(() => {
     const token = window.localStorage.getItem('tt_token');
@@ -376,15 +356,15 @@ export default function Home() {
         return;
       }
 
-      const data = await res.json() as AnalysisData;
-      setAnalysisData(data);
+      const data = await res.json() as AnalyzeResponse;
+      setAnalysisData(adaptAnalysis(data, duration));
       setAnalysisStep(3);
       setAnalysisError('');
       setAnalysisPhase('done');
     } finally {
       stepTimers.forEach(window.clearTimeout);
     }
-  }, [analysisPhase, authedFetch, sourceLang, subtitles]);
+  }, [analysisPhase, authedFetch, duration, sourceLang, subtitles]);
 
   useEffect(() => {
     if (phase === 'recognized' && analysisPhase === 'none') {
@@ -484,6 +464,9 @@ export default function Home() {
           analysisStep={analysisStep}
           analysisError={analysisError}
           data={analysisData}
+          durationSec={duration}
+          products={products}
+          setProducts={setProducts}
           thread={thread}
           onSend={onSend}
           askPending={askPending}

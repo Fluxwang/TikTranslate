@@ -44,3 +44,4 @@ next-env.d.ts
 response.json
 test.py
 tiktranslate-test.html
+docs/*
