@@ -346,7 +346,13 @@ export default function Home() {
       const res = await authedFetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subtitles, sourceLang }),
+        body: JSON.stringify({
+          subtitles,
+          sourceLang,
+          videoUrls,
+          videoIndex,
+          durationSec: duration,
+        }),
       });
 
       if (!res.ok) {
@@ -364,7 +370,7 @@ export default function Home() {
     } finally {
       stepTimers.forEach(window.clearTimeout);
     }
-  }, [analysisPhase, authedFetch, duration, sourceLang, subtitles]);
+  }, [analysisPhase, authedFetch, duration, sourceLang, subtitles, videoIndex, videoUrls]);
 
   useEffect(() => {
     if (phase === 'recognized' && analysisPhase === 'none') {

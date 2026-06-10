@@ -97,6 +97,9 @@ WHISPER_MODEL=openai/gpt-4o-mini-transcribe
 ANALYSIS_API_KEY=your_analysis_key
 ANALYSIS_BASE_URL=https://api.deepseek.com
 ANALYSIS_MODEL=deepseek-v4-flash
+ANALYSIS_VIDEO_API_KEY=your_video_analysis_key
+ANALYSIS_VIDEO_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+ANALYSIS_VIDEO_MODEL=qwen3.7-plus
 
 # Access password (users enter this at the login screen)
 AUTH_TOKEN=your_password
@@ -183,7 +186,7 @@ You can also deploy to Vercel with one click — just add all environment variab
 ## Customization
 
 - **Change source language** — update `sourceLang` from `es` to any BCP-47 code (e.g. `en`, `pt`)
-- **Swap AI model** — set `ANALYSIS_BASE_URL` + `ANALYSIS_MODEL` to any OpenAI-compatible endpoint (OpenAI, Claude, Gemini, etc.)
+- **Swap AI model** — set `ANALYSIS_API_KEY` + `ANALYSIS_BASE_URL` + `ANALYSIS_MODEL` for subtitle translation and chat; set `ANALYSIS_VIDEO_API_KEY` + `ANALYSIS_VIDEO_BASE_URL` + `ANALYSIS_VIDEO_MODEL` for video analysis.
 - **Swap transcription service** — set `WHISPER_BASE_URL` + `WHISPER_MODEL` to switch to Groq or any other Whisper-compatible API
 
 ---

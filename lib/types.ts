@@ -43,6 +43,25 @@ export interface ScriptTemplate {
   text: string;
 }
 
+export interface AnalysisMeta {
+  analysisMode: 'video_text' | 'text_only';
+  videoInputMode: 'test_url' | 'server_tmp_url' | 'none';
+  videoObserved: boolean;
+  videoFallbackReason:
+    | null
+    | 'no_video_input'
+    | 'invalid_video_url'
+    | 'test_video_url_invalid'
+    | 'public_app_url_missing'
+    | 'public_app_url_invalid'
+    | 'video_download_failed'
+    | 'video_too_large'
+    | 'tmp_video_url_unavailable'
+    | 'qwen_video_failed'
+    | 'qwen_video_json_parse_failed'
+    | 'qwen_video_not_observed';
+}
+
 /** Fully-adapted analysis data consumed by AnalysisPanel. */
 export interface AnalysisData {
   overall: { score: number; label: string };
@@ -68,6 +87,7 @@ export interface AnalyzeResponse {
   videoStructure?: VideoStructureSegment[];
   hooks?: HookItem[];
   templates?: ScriptTemplate[];
+  meta?: AnalysisMeta;
 }
 
 export interface Product {
