@@ -22,7 +22,6 @@ type Subtitle = {
 
 type AnalyzeRequestBody = {
   subtitles?: unknown;
-  sourceLang?: unknown;
   videoUrls?: unknown;
   videoIndex?: unknown;
   durationSec?: unknown;
@@ -41,15 +40,6 @@ type MessageContent =
       text: string;
     }
   >;
-
-const LANGUAGE_LABELS: Record<string, string> = {
-  es: '西班牙语',
-  en: '英语',
-  pt: '葡萄牙语',
-  id: '印尼语',
-  vi: '越南语',
-  th: '泰语',
-};
 
 const SCORE_DIMS = ['说服力', '钩子强度', '爆款潜力', '转化引导', '视觉演示'];
 
@@ -90,10 +80,6 @@ function parseAnalysis(content: string) {
   }
 }
 
-function normalizeSourceLang(value: unknown) {
-  const lang = typeof value === 'string' ? value.trim().toLowerCase() : 'es';
-  return LANGUAGE_LABELS[lang] ? lang : 'es';
-}
 
 function getDurationSec(value: unknown) {
   const duration = typeof value === 'number' ? value : Number.parseFloat(String(value ?? '0'));
@@ -114,7 +100,6 @@ function buildTranscript(subtitles: Subtitle[]) {
 }
 
 function buildPrompt(options: {
-  sourceLabel: string;
   transcript: string;
   durationSec: number;
   hasVideo: boolean;
@@ -126,7 +111,7 @@ function buildPrompt(options: {
   return `用户是国内电商从业者，目标是拆解海外 TikTok 带货视频。
 ${modeInstruction}
 
-字幕格式为「时间 ${options.sourceLabel}原文 / 中文翻译」。
+字幕格式为「时间 原文 / 中文翻译」。
 视频时长参考：${options.durationSec > 0 ? `${Math.round(options.durationSec)} 秒` : '未知'}。
 
 字幕：
@@ -461,8 +446,6 @@ export async function POST(req: Request) {
   }
 
   const subtitles = body.subtitles as Subtitle[];
-  const sourceLang = normalizeSourceLang(body.sourceLang);
-  const sourceLabel = LANGUAGE_LABELS[sourceLang] ?? '原始语言';
   const transcript = buildTranscript(subtitles);
   const durationSec = getDurationSec(body.durationSec);
   const prepared = await selectVideoInput(body);
@@ -472,7 +455,6 @@ export async function POST(req: Request) {
   try {
     if (prepared.input) {
       const videoPrompt = buildPrompt({
-        sourceLabel,
         transcript,
         durationSec,
         hasVideo: true,
@@ -502,7 +484,6 @@ export async function POST(req: Request) {
     }
 
     const textPrompt = buildPrompt({
-      sourceLabel,
       transcript,
       durationSec,
       hasVideo: false,

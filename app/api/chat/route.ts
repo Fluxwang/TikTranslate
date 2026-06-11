@@ -13,26 +13,12 @@ type Subtitle = {
   zh: string;
 };
 
-const LANGUAGE_LABELS: Record<string, string> = {
-  es: '西班牙语',
-  en: '英语',
-  pt: '葡萄牙语',
-  id: '印尼语',
-  vi: '越南语',
-  th: '泰语',
-};
-
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
 }
 
 function error(status: number, code: string, detail?: string) {
   return json(detail ? { error: code, detail } : { error: code }, status);
-}
-
-function normalizeSourceLang(value: unknown) {
-  const lang = typeof value === 'string' ? value.trim().toLowerCase() : 'es';
-  return LANGUAGE_LABELS[lang] ? lang : 'es';
 }
 
 export async function POST(req: Request) {
@@ -46,7 +32,6 @@ export async function POST(req: Request) {
     question?: unknown;
     history?: unknown;
     subtitles?: unknown;
-    sourceLang?: unknown;
     analysis?: unknown;
   };
   try {
@@ -70,8 +55,6 @@ export async function POST(req: Request) {
   }) : [];
 
   const transcript = subtitles.map((s) => `[${s.t}] ${s.es} / ${s.zh}`).join('\n');
-  const sourceLang = normalizeSourceLang(body.sourceLang);
-  const sourceLabel = LANGUAGE_LABELS[sourceLang] ?? '原始语言';
 
   let res: Response;
   try {
@@ -86,7 +69,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'system',
-            content: `你是一位专业的 TikTok 带货话术分析师。请基于字幕和已完成的分析回答用户追问，字幕格式为「时间 ${sourceLabel}原文 / 中文翻译」。回复中文，直接给结论。\n\n字幕：\n${transcript}\n\n分析结果：\n${JSON.stringify(body.analysis ?? {})}`,
+            content: `你是一位专业的 TikTok 带货话术分析师。请基于字幕和已完成的分析回答用户追问，字幕格式为「时间 原文 / 中文翻译」。回复中文，直接给结论。\n\n字幕：\n${transcript}\n\n分析结果：\n${JSON.stringify(body.analysis ?? {})}`,
           },
           ...history,
           { role: 'user', content: body.question.trim() },

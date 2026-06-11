@@ -28,7 +28,6 @@ export default function Home() {
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [phase, setPhase] = useState<Phase>('idle');
   const [url, setUrl] = useState('');
-  const [sourceLang, setSourceLang] = useState('es');
   const [videoUrls, setVideoUrls] = useState<string[]>([]);
   const [videoIndex, setVideoIndex] = useState(0);
   const [coverUrl, setCoverUrl] = useState('');
@@ -102,8 +101,6 @@ export default function Home() {
       const form = new FormData();
       form.set('audio', blob, 'chunk.webm');
       form.set('startOffset', String(startOffset));
-      form.set('sourceLang', sourceLang);
-
       const res = await authedFetch('/api/transcribe', {
         method: 'POST',
         body: form,
@@ -118,7 +115,7 @@ export default function Home() {
     } finally {
       setTranscribePending((n) => Math.max(0, n - 1));
     }
-  }, [authedFetch, sourceLang]);
+  }, [authedFetch]);
 
   const startRecorder = useCallback(() => {
     const video = videoRef.current;
@@ -348,7 +345,6 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subtitles,
-          sourceLang,
           videoUrls,
           videoIndex,
           durationSec: duration,
@@ -370,7 +366,7 @@ export default function Home() {
     } finally {
       stepTimers.forEach(window.clearTimeout);
     }
-  }, [analysisPhase, authedFetch, duration, sourceLang, subtitles, videoIndex, videoUrls]);
+  }, [analysisPhase, authedFetch, duration, subtitles, videoIndex, videoUrls]);
 
   useEffect(() => {
     if (phase === 'recognized' && analysisPhase === 'none') {
@@ -402,7 +398,6 @@ export default function Home() {
           question: q,
           history,
           subtitles,
-          sourceLang,
           analysis: analysisData,
         }),
       });
@@ -430,8 +425,6 @@ export default function Home() {
         phase={phase}
         url={url}
         setUrl={setUrl}
-        sourceLang={sourceLang}
-        setSourceLang={setSourceLang}
         onParse={onParse}
         theme={theme}
         onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
