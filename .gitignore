@@ -30,10 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-# .env*
-.env.local
-.env
+# env files
+.env*
+!.env.example
 
 # vercel
 .vercel
@@ -41,6 +40,25 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-response.json
+
+# local/debug outputs
+*.log
+response*.json
 test.py
 tiktranslate-test.html
+*.sqlite
+*.sqlite3
+*.db
+
+# local runtime storage
+/tmp
+/logs
+/tiktranslate-analysis-videos
+/analysis-videos
+/tmp-videos
+
+# docs/*
+.agents/*
+.claude/*
+.github/*
+skills/*

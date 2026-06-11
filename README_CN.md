@@ -97,6 +97,9 @@ WHISPER_MODEL=openai/gpt-4o-mini-transcribe
 ANALYSIS_API_KEY=your_analysis_key
 ANALYSIS_BASE_URL=https://api.deepseek.com
 ANALYSIS_MODEL=deepseek-v4-flash
+ANALYSIS_VIDEO_API_KEY=your_video_analysis_key
+ANALYSIS_VIDEO_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+ANALYSIS_VIDEO_MODEL=qwen3.7-plus
 
 # 访问密码（用户登录时输入此 token）
 AUTH_TOKEN=your_password
@@ -183,7 +186,7 @@ pnpm start
 ## 本地化 & 扩展
 
 - **换语言**：将 `sourceLang` 从 `es`（西语）改为其他 BCP-47 语言代码即可（如 `en`、`pt`）
-- **换 AI 模型**：修改 `ANALYSIS_BASE_URL` + `ANALYSIS_MODEL` 可接入任意 OpenAI 兼容接口（如 OpenAI、Claude、Gemini 等）
+- **换 AI 模型**：字幕翻译和追问使用 `ANALYSIS_API_KEY` + `ANALYSIS_BASE_URL` + `ANALYSIS_MODEL`；视频分析使用 `ANALYSIS_VIDEO_API_KEY` + `ANALYSIS_VIDEO_BASE_URL` + `ANALYSIS_VIDEO_MODEL`。
 - **换转录服务**：修改 `WHISPER_BASE_URL` + `WHISPER_MODEL` 可切换到 Groq 或其他 Whisper 兼容接口
 
 ---
