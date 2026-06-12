@@ -20,7 +20,6 @@ export default function Home() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recorderTimerRef = useRef<number | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const chunkStartRef = useRef(0);
   const endedRef = useRef(false);
@@ -74,11 +73,6 @@ export default function Home() {
   }, [router]);
 
   const stopRecorder = useCallback((finalizing = false) => {
-    if (recorderTimerRef.current != null) {
-      window.clearInterval(recorderTimerRef.current);
-      recorderTimerRef.current = null;
-    }
-
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
       if (finalizing) setRecorderFinalizing(true);
@@ -101,6 +95,7 @@ export default function Home() {
       const form = new FormData();
       form.set('audio', blob, 'chunk.webm');
       form.set('startOffset', String(startOffset));
+      form.set('durationSec', String(duration));
       const res = await authedFetch('/api/transcribe', {
         method: 'POST',
         body: form,
@@ -115,11 +110,11 @@ export default function Home() {
     } finally {
       setTranscribePending((n) => Math.max(0, n - 1));
     }
-  }, [authedFetch]);
+  }, [authedFetch, duration]);
 
   const startRecorder = useCallback(() => {
     const video = videoRef.current;
-    if (!video || mediaRecorderRef.current || recorderTimerRef.current != null) return;
+    if (!video || mediaRecorderRef.current) return;
 
     const getAudioStream = () => {
       if (audioStreamRef.current?.getAudioTracks().some((track) => track.readyState === 'live')) {
@@ -163,15 +158,6 @@ export default function Home() {
     };
 
     startChunkRecorder();
-    recorderTimerRef.current = window.setInterval(() => {
-      const recorder = mediaRecorderRef.current;
-      const currentVideo = videoRef.current;
-      if (!currentVideo || currentVideo.paused || currentVideo.ended || recorder?.state !== 'recording') return;
-
-      recorder.stop();
-      mediaRecorderRef.current = null;
-      window.setTimeout(startChunkRecorder, 0);
-    }, 15_000);
   }, [sendAudioChunk]);
 
   const onParse = async () => {
@@ -329,7 +315,7 @@ export default function Home() {
   }, [phase, recorderFinalizing, transcribePending]);
 
   const startAnalysis = useCallback(async () => {
-    if (subtitles.length === 0 || analysisPhase !== 'none') return;
+    if (phase !== 'recognized' || subtitles.length === 0 || analysisPhase !== 'none') return;
 
     setAnalysisPhase('analyzing');
     setAnalysisStep(0);
@@ -366,16 +352,7 @@ export default function Home() {
     } finally {
       stepTimers.forEach(window.clearTimeout);
     }
-  }, [analysisPhase, authedFetch, duration, subtitles, videoIndex, videoUrls]);
-
-  useEffect(() => {
-    if (phase === 'recognized' && analysisPhase === 'none') {
-      const timer = window.setTimeout(() => {
-        void startAnalysis();
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [analysisPhase, phase, startAnalysis]);
+  }, [analysisPhase, authedFetch, duration, phase, subtitles, videoIndex, videoUrls]);
 
   const onSend = async (q: string) => {
     const history = thread.flatMap((m) => {
@@ -469,6 +446,7 @@ export default function Home() {
           thread={thread}
           onSend={onSend}
           askPending={askPending}
+          onStartAnalysis={startAnalysis}
         />
       </div>
     </div>

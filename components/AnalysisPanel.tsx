@@ -25,6 +25,7 @@ interface Props {
   thread: { q: string; a: string | null }[];
   onSend: (q: string) => void;
   askPending: boolean;
+  onStartAnalysis: () => void;
 }
 
 const MD_COMPONENTS: Components = {
@@ -736,6 +737,7 @@ export default function AnalysisPanel({
   thread,
   onSend,
   askPending,
+  onStartAnalysis,
 }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
   const [settings, setSettings] = useState(false);
@@ -766,9 +768,10 @@ export default function AnalysisPanel({
             <button
               className="btn btn-ghost"
               style={{ height: 26, padding: "0 10px", fontSize: 11 }}
-              disabled
+              disabled={phase !== "recognized"}
+              onClick={onStartAnalysis}
             >
-              等待字幕
+              {phase === "recognized" ? "开始分析" : "等待字幕"}
             </button>
           ) : analysisPhase === "analyzing" ? (
             <button
@@ -810,7 +813,7 @@ export default function AnalysisPanel({
           </div>
           <div className="es">
             {phase === "recognized"
-              ? "AI 将自动提取卖点、拆解视频结构、给视频打分并生成达人建议。"
+              ? "点击「开始分析」提取卖点、拆解视频结构并生成达人建议。"
               : "识别完成后即可对达人话术进行结构、评分与话术分析。"}
           </div>
         </div>
