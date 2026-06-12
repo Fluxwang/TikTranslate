@@ -41,6 +41,11 @@ function getAudioFormat(audio: Blob) {
   return subtype.replace(/^x-/, '');
 }
 
+async function blobToBase64(blob: Blob) {
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  return buffer.toString('base64');
+}
+
 async function readUpstreamError(res: Response) {
   const text = await res.text().catch(() => '');
   return text ? `Whisper status ${res.status}: ${text.slice(0, 1000)}` : `Whisper status ${res.status}`;
@@ -137,17 +142,20 @@ export async function POST(req: Request) {
   let upstream: Response;
   try {
     const apiKey = getRequiredEnv('OPENROUTER_API_KEY');
-    const whisperForm = new FormData();
-    whisperForm.append('file', audio, `audio.${getAudioFormat(audio)}`);
-    whisperForm.append('model', process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3-turbo');
-    whisperForm.append('response_format', 'verbose_json');
-    whisperForm.append('timestamp_granularities[]', 'segment');
     upstream = await fetch(`${baseUrl}/audio/transcriptions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      body: whisperForm,
+      body: JSON.stringify({
+        model: process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3-turbo',
+        input_audio: {
+          data: await blobToBase64(audio),
+          format: getAudioFormat(audio),
+        },
+        response_format: 'verbose_json',
+      }),
       cache: 'no-store',
     });
   } catch (err) {
