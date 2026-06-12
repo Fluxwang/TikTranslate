@@ -149,11 +149,13 @@ export async function POST(req: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3',
+        model: process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3-turbo',
         input_audio: {
           data: await blobToBase64(audio),
           format: getAudioFormat(audio),
         },
+        response_format: 'verbose_json',
+        timestamp_granularities: ['segment'],
       }),
       cache: 'no-store',
     });
