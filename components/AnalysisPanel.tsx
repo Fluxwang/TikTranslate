@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useReducer,
   useRef,
   useState,
   type ChangeEvent,
@@ -10,8 +11,14 @@ import {
 } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { buildCreatorSuggestion } from "@/lib/analysis";
-import type { AnalysisData, AnalysisPhase, Phase, Product } from "@/lib/types";
+import type {
+  AnalysisData,
+  AnalysisPhase,
+  Phase,
+  Product,
+  SuggestAnalysis,
+  SuggestResponse,
+} from "@/lib/types";
 
 interface Props {
   phase: Phase;
@@ -24,7 +31,26 @@ interface Props {
   setProducts: Dispatch<SetStateAction<Product[]>>;
   thread: { q: string; a: string | null }[];
   onSend: (q: string) => void;
+  onSuggest: (product: Product, analysis: SuggestAnalysis) => Promise<SuggestResponse>;
   askPending: boolean;
+  onStartAnalysis: () => void;
+}
+
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, "")
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/_(.+?)_/g, "$1")
+    .replace(/~~(.+?)~~/g, "$1")
+    .replace(/`(.+?)`/g, "$1")
+    .replace(/\[(.+?)\]\(.+?\)/g, "$1")
+    .replace(/^[-*+]\s+/gm, "")
+    .replace(/^\d+\.\s+/gm, "")
+    .replace(/^>\s+/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 const MD_COMPONENTS: Components = {
@@ -197,6 +223,44 @@ const AI_TABS = [
 ] as const;
 
 type TabId = (typeof AI_TABS)[number]["id"];
+type CreatorLang = "en" | "es" | "zh";
+
+type CreatorState = {
+  productId: string;
+  loading: boolean;
+  results: SuggestResponse | null;
+  lang: CreatorLang;
+  error: boolean;
+  copied: boolean;
+};
+
+type CreatorAction =
+  | { type: "selectProduct"; productId: string }
+  | { type: "startGenerate" }
+  | { type: "generateSuccess"; results: SuggestResponse }
+  | { type: "generateError" }
+  | { type: "setLang"; lang: CreatorLang }
+  | { type: "copied" }
+  | { type: "resetCopied" };
+
+function creatorReducer(state: CreatorState, action: CreatorAction): CreatorState {
+  switch (action.type) {
+    case "selectProduct":
+      return { ...state, productId: action.productId };
+    case "startGenerate":
+      return { ...state, loading: true, results: null, error: false, copied: false };
+    case "generateSuccess":
+      return { ...state, loading: false, results: action.results, error: false };
+    case "generateError":
+      return { ...state, loading: false, results: null, error: true, copied: false };
+    case "setLang":
+      return { ...state, lang: action.lang, copied: false };
+    case "copied":
+      return { ...state, copied: true };
+    case "resetCopied":
+      return { ...state, copied: false };
+  }
+}
 
 /* ============================================================
    TAB 1 — 概览
@@ -381,41 +445,56 @@ function ScriptsTab({ data }: { data: AnalysisData }) {
    ============================================================ */
 function CreatorTab({
   data,
+  analysisPhase,
   products,
+  onSuggest,
 }: {
   data: AnalysisData;
+  analysisPhase: AnalysisPhase;
   products: Product[];
+  onSuggest: (product: Product, analysis: SuggestAnalysis) => Promise<SuggestResponse>;
 }) {
-  const [productId, setProductId] = useState(products[0]?.id ?? "");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [state, dispatch] = useReducer(creatorReducer, products[0]?.id ?? "", (productId): CreatorState => ({
+    productId,
+    loading: false,
+    results: null,
+    lang: "en",
+    error: false,
+    copied: false,
+  }));
   const copyTimer = useRef<number | null>(null);
 
   // 设置页删了某个产品时，回退到第一个
-  const product = products.find((p) => p.id === productId) ?? products[0];
+  const product = products.find((p) => p.id === state.productId) ?? products[0];
+  const canGenerate = analysisPhase === "done";
+  const currentResult = state.results?.[state.lang] ?? "";
 
-  const onGenerate = () => {
-    if (!product || loading) return;
-    setLoading(true);
-    setResult("");
-    setCopied(false);
-    // 占位实现：前端模板拼接生成英文建议。
-    // 后续可替换为调用 /api/suggest 由 AI 实时生成，详见集成文档。
-    window.setTimeout(() => {
-      setResult(buildCreatorSuggestion(product, data));
-      setLoading(false);
-    }, 500);
+  const onGenerate = async () => {
+    if (!product || state.loading || !canGenerate) return;
+    dispatch({ type: "startGenerate" });
+    try {
+      const json = await onSuggest(product, {
+        hooks: data.hooks,
+        videoStructure: data.videoStructure,
+        templates: data.templates,
+        sellingPoints: data.sellingPoints.map((sp) => sp.text),
+        summary: data.summary,
+      });
+      dispatch({ type: "generateSuccess", results: json });
+    } catch {
+      dispatch({ type: "generateError" });
+    }
   };
 
   const onCopy = () => {
+    if (!currentResult) return;
     const done = () => {
-      setCopied(true);
+      dispatch({ type: "copied" });
       if (copyTimer.current != null) window.clearTimeout(copyTimer.current);
-      copyTimer.current = window.setTimeout(() => setCopied(false), 2000);
+      copyTimer.current = window.setTimeout(() => dispatch({ type: "resetCopied" }), 2000);
     };
     if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(result).then(done, done);
+      navigator.clipboard.writeText(stripMarkdown(currentResult)).then(done, done);
     } else {
       done();
     }
@@ -431,7 +510,7 @@ function CreatorTab({
         <select
           className="gen-select"
           value={product.id}
-          onChange={(e) => setProductId(e.target.value)}
+          onChange={(e) => dispatch({ type: "selectProduct", productId: e.target.value })}
         >
           {products.map((p) => (
             <option key={p.id} value={p.id}>
@@ -439,8 +518,14 @@ function CreatorTab({
             </option>
           ))}
         </select>
-        <button className="gen-btn" disabled={loading} onClick={onGenerate}>
-          {loading ? (
+        <button
+          type="button"
+          className="gen-btn"
+          disabled={state.loading || !canGenerate}
+          onClick={onGenerate}
+          title={canGenerate ? undefined : "请先完成视频分析"}
+        >
+          {state.loading ? (
             <>
               <span className="spinner" /> Generating...
             </>
@@ -452,24 +537,42 @@ function CreatorTab({
 
       {/* 可滚动的结果区域 */}
       <div className="creator-result">
-        {loading && !result && (
+        {state.loading && !state.results && (
           <div className="gen-result">
             <div className="gen-body">
               <CardSkeleton lines={5} />
             </div>
           </div>
         )}
-        {result && (
+        {state.error && (
+          <div className="gen-error">
+            <Icon name="alertCircle" size={15} /> 生成失败，请重试
+          </div>
+        )}
+        {state.results && (
           <div className="gen-result">
             <div className="bar">
               <span className="ready">
                 <span className="dot" /> Ready to send
               </span>
+              <div className="lang-pills">
+                {(["en", "es", "zh"] as const).map((item) => (
+                  <button
+                    type="button"
+                    key={item}
+                    className={`lang-pill${state.lang === item ? " on" : ""}`}
+                    onClick={() => dispatch({ type: "setLang", lang: item })}
+                  >
+                    {item.toUpperCase()}
+                  </button>
+                ))}
+              </div>
               <button
-                className={`copy-btn${copied ? " copied" : ""}`}
+                type="button"
+                className={`copy-btn${state.copied ? " copied" : ""}`}
                 onClick={onCopy}
               >
-                {copied ? (
+                {state.copied ? (
                   <>
                     <Icon name="check" size={13} /> Copied
                   </>
@@ -480,7 +583,11 @@ function CreatorTab({
                 )}
               </button>
             </div>
-            <div className="gen-body">{result}</div>
+            <div className="gen-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
+                {currentResult}
+              </ReactMarkdown>
+            </div>
           </div>
         )}
       </div>
@@ -735,7 +842,9 @@ export default function AnalysisPanel({
   setProducts,
   thread,
   onSend,
+  onSuggest,
   askPending,
+  onStartAnalysis,
 }: Props) {
   const [tab, setTab] = useState<TabId>("overview");
   const [settings, setSettings] = useState(false);
@@ -766,9 +875,10 @@ export default function AnalysisPanel({
             <button
               className="btn btn-ghost"
               style={{ height: 26, padding: "0 10px", fontSize: 11 }}
-              disabled
+              disabled={phase !== "recognized"}
+              onClick={onStartAnalysis}
             >
-              等待字幕
+              {phase === "recognized" ? "开始分析" : "等待字幕"}
             </button>
           ) : analysisPhase === "analyzing" ? (
             <button
@@ -791,6 +901,7 @@ export default function AnalysisPanel({
             </span>
           )}
           <button
+            type="button"
             className="icon-btn gear"
             title="产品设置"
             onClick={() => setSettings(true)}
@@ -810,7 +921,7 @@ export default function AnalysisPanel({
           </div>
           <div className="es">
             {phase === "recognized"
-              ? "AI 将自动提取卖点、拆解视频结构、给视频打分并生成达人建议。"
+              ? "点击「开始分析」提取卖点、拆解视频结构并生成达人建议。"
               : "识别完成后即可对达人话术进行结构、评分与话术分析。"}
           </div>
         </div>
@@ -830,6 +941,7 @@ export default function AnalysisPanel({
           <div className="ai-tabnav">
             {AI_TABS.map((t) => (
               <button
+                type="button"
                 key={t.id}
                 className={`tab${tab === t.id ? " on" : ""}`}
                 onClick={() => setTab(t.id)}
@@ -851,11 +963,12 @@ export default function AnalysisPanel({
           {tab === "scripts" &&
             (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
           {tab === "creator" &&
-            (done ? (
-              <CreatorTab data={data} products={products} />
-            ) : (
-              <LoadingTab />
-            ))}
+            <CreatorTab
+              data={data}
+              analysisPhase={analysisPhase}
+              products={products}
+              onSuggest={onSuggest}
+            />}
           {tab === "ask" &&
             (done ? (
               <AskTab

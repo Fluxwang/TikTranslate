@@ -807,7 +807,8 @@ input, textarea, select { font-family: inherit; }
   animation: cardIn 0.4s var(--ease) both;
 }
 .gen-result .bar {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex-wrap: wrap;
   padding: 9px 12px;
   border-bottom: 0.5px solid var(--color-border-tertiary);
   background: var(--color-background-primary);
@@ -822,6 +823,37 @@ input, textarea, select { font-family: inherit; }
   width: 6px; height: 6px; border-radius: 50%;
   background: var(--status-live);
 }
+.lang-pills {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--color-background-secondary);
+  border: 0.5px solid var(--color-border-secondary);
+}
+.lang-pill {
+  height: 22px;
+  min-width: 36px;
+  padding: 0 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.lang-pill:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-background-primary) 60%, transparent);
+}
+.lang-pill.on {
+  color: var(--accent);
+  background: var(--color-background-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0.5px 1px rgba(0, 0, 0, 0.08);
+}
 .copy-btn {
   display: inline-flex; align-items: center; gap: 5px;
   height: 26px; padding: 0 11px;
@@ -835,14 +867,34 @@ input, textarea, select { font-family: inherit; }
 .copy-btn:hover { color: var(--color-text-primary); border-color: var(--color-text-tertiary); }
 .copy-btn.copied { color: var(--status-live); border-color: color-mix(in srgb, var(--status-live) 45%, transparent); }
 
+.gen-error {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 10%, var(--color-background-secondary));
+  border: 0.5px solid color-mix(in srgb, var(--c) 35%, transparent);
+  border-radius: var(--border-radius-md);
+  --c: oklch(0.62 0.18 25);
+}
+
 .gen-body {
   padding: 14px 14px 16px;
   font-size: 14px;
   line-height: 1.8;
   color: var(--color-text-primary);
-  white-space: pre-wrap;
   text-wrap: pretty;
 }
+.gen-body p { margin: 0 0 0.75em; }
+.gen-body p:empty { display: none; }
+.gen-body p:last-child { margin-bottom: 0; }
+.gen-body strong { font-weight: 600; }
+.gen-body em { font-style: italic; }
+.gen-body ul, .gen-body ol { margin: 0 0 0.75em; padding-left: 1.4em; }
+.gen-body li { margin-bottom: 0.25em; }
 
 /* ---- 产品设置页（覆盖整个侧栏，非弹窗） ---- */
 .settings {

@@ -8,17 +8,14 @@ interface Props {
   phase: Phase;
   url: string;
   setUrl: (v: string) => void;
-  sourceLang: string;
-  setSourceLang: (v: string) => void;
   onParse: () => void;
   theme: 'light' | 'dark';
   onToggleTheme: () => void;
 }
 
-export default function TopBar({ phase, url, setUrl, sourceLang, setSourceLang, onParse, theme, onToggleTheme }: Props) {
+export default function TopBar({ phase, url, setUrl, onParse, theme, onToggleTheme }: Props) {
   const [focused, setFocused] = useState(false);
   const parsing = phase === 'parsing';
-  const languageLocked = phase === 'parsing' || phase === 'recognizing';
   const canParse = url.trim().length > 0 && !parsing;
 
   return (
@@ -45,21 +42,6 @@ export default function TopBar({ phase, url, setUrl, sourceLang, setSourceLang, 
       </div>
 
       <div className="topbar-right">
-        <label className="lang-select" title="原始语言">
-          <span>原始语言</span>
-          <select
-            value={sourceLang}
-            disabled={languageLocked}
-            onChange={(event) => setSourceLang(event.target.value)}
-          >
-            <option value="es">西班牙语</option>
-            <option value="en">英语</option>
-            <option value="pt">葡萄牙语</option>
-            <option value="id">印尼语</option>
-            <option value="vi">越南语</option>
-            <option value="th">泰语</option>
-          </select>
-        </label>
         <button className="btn btn-primary" disabled={!canParse} onClick={onParse}>
           {parsing ? <><span className="spinner" /> 解析中</> : '解析'}
         </button>
