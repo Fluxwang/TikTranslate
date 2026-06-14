@@ -97,3 +97,17 @@ export interface Product {
   sellingPoints: string;
   scene: string;
 }
+
+export interface SuggestAnalysis {
+  hooks: HookItem[];
+  videoStructure: VideoStructureSegment[];
+  templates: ScriptTemplate[];
+  sellingPoints: string[];
+  summary: string;
+}
+
+export interface SuggestResponse {
+  en: string;
+  es: string;
+  zh: string;
+}

@@ -7,7 +7,16 @@ import VideoPanel from '@/components/VideoPanel';
 import SubtitlePanel from '@/components/SubtitlePanel';
 import AnalysisPanel from '@/components/AnalysisPanel';
 import { adaptAnalysis, EMPTY_ANALYSIS, loadProducts, saveProducts } from '@/lib/analysis';
-import type { AnalysisData, AnalysisPhase, AnalyzeResponse, Phase, Product, Subtitle } from '@/lib/types';
+import type {
+  AnalysisData,
+  AnalysisPhase,
+  AnalyzeResponse,
+  Phase,
+  Product,
+  Subtitle,
+  SuggestAnalysis,
+  SuggestResponse,
+} from '@/lib/types';
 
 type TikHubResponse = {
   videoUrls: string[];
@@ -385,6 +394,19 @@ export default function Home() {
     }
   };
 
+  const onSuggest = useCallback(async (
+    product: Product,
+    analysis: SuggestAnalysis,
+  ): Promise<SuggestResponse> => {
+    const res = await authedFetch('/api/suggest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product, analysis }),
+    });
+    if (!res.ok) throw new Error('suggest failed');
+    return await res.json() as SuggestResponse;
+  }, [authedFetch]);
+
   const recognizedCount = subtitles.length;
   const activeIdx = useMemo(() => {
     let idx = -1;
@@ -445,6 +467,7 @@ export default function Home() {
           setProducts={setProducts}
           thread={thread}
           onSend={onSend}
+          onSuggest={onSuggest}
           askPending={askPending}
           onStartAnalysis={startAnalysis}
         />
