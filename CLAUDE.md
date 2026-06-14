@@ -4,6 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 @AGENTS.md
 
+## Background
+
+This Project is use to analysis the Hot topic Video, And Analysis the Detail of the video, and generator the Information to user, In the Ai Analysis Have five Tab
+
+- "概念"
+- "视频结构"
+- "爆点话术"
+- "达人建议"
+- "追问AI"
+
+The feather of "达人建议" is use the Information of the Video, To generator the Text, And the user can use the text send to the cooperate
+
 ## Commands
 
 ```bash
