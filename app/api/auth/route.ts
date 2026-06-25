@@ -51,7 +51,8 @@ export async function POST(req: Request) {
     return error(400, 'missing_password');
   }
 
-  if (body.password !== process.env.AUTH_TOKEN) {
+  const validTokens = [process.env.AUTH_TOKEN, process.env.DEMO_AUTH_TOKEN].filter(Boolean);
+  if (!validTokens.includes(body.password)) {
     return error(401, 'invalid_password');
   }
 

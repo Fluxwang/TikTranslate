@@ -8,12 +8,20 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState('');
+  const [demoHint, setDemoHint] = useState<string | null>(null);
 
   useEffect(() => {
     if (window.localStorage.getItem('tt_token')) {
       router.replace('/');
     }
   }, [router]);
+
+  useEffect(() => {
+    fetch('/api/demo-hint')
+      .then((r) => r.json() as Promise<{ hint: string | null }>)
+      .then((data) => setDemoHint(data.hint))
+      .catch(() => {});
+  }, []);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -58,6 +66,11 @@ export default function LoginPage() {
           autoFocus
           onChange={(event) => setPassword(event.target.value)}
         />
+        {demoHint && (
+          <div className="login-demo-hint">
+            Demo 密码：<code>{demoHint}</code>
+          </div>
+        )}
         {message && <div className="login-error">{message}</div>}
         <button className="btn btn-primary login-submit" disabled={!password || pending}>
           {pending ? <><span className="spinner" /> 登录中</> : '登录'}
