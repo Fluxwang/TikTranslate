@@ -62,7 +62,7 @@ async function readUpstreamError(res: Response) {
 }
 
 function joinWords(words: string[]) {
-  return words.join('').replace(/\s+([,.;:!?])/g, '$1').replace(/\s+/g, ' ').trim();
+  return words.join(' ').replace(/\s+([,.;:!?])/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
 // 字幕断句的启发式规则（按优先级）：句子说完了 → 词数够且停顿够长 → 太长了刚好在标点处 → 硬性超长兜底

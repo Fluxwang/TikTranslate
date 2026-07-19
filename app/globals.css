@@ -337,8 +337,8 @@ input, textarea, select { font-family: inherit; }
   font-variant-numeric: tabular-nums; padding-top: 1px;
 }
 .sub-row .lines { flex: 1; min-width: 0; }
-.sub-row .src { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 2px; line-height: 1.4; }
-.sub-row .dst { font-size: 11px; color: var(--color-text-primary); line-height: 1.4; }
+.sub-row .src { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 2px; line-height: 1.4; overflow-wrap: anywhere; }
+.sub-row .dst { font-size: 11px; color: var(--color-text-primary); line-height: 1.4; overflow-wrap: anywhere; }
 .sub-row.active { opacity: 1; background: var(--color-background-secondary); border-left: 2px solid var(--color-text-primary); }
 .sub-row.active .ts { color: var(--color-text-secondary); font-weight: 500; }
 .sub-row.active .dst { font-size: 12px; font-weight: 500; }
