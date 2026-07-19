@@ -1,5 +1,7 @@
 import { signJWT } from '@/lib/auth';
 
+// 限流状态存在进程内存里，只对单个实例有效：多实例部署或进程重启后会重置，
+// 不是一个严格意义上的分布式限流，只用于挡最基础的暴力破解
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
@@ -12,6 +14,8 @@ function error(status: number, code: string, detail?: string) {
   return json(detail ? { error: code, detail } : { error: code }, status);
 }
 
+// x-forwarded-for 可能是逗号分隔的多级代理链（client, proxy1, proxy2...），取第一个即最初的客户端 IP；
+// 这两个头都是可以被客户端伪造的，能起到的限流效果依赖部署环境本身的反向代理配置是否可信
 function getClientIp(req: Request) {
   return (
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
@@ -51,6 +55,7 @@ export async function POST(req: Request) {
     return error(400, 'missing_password');
   }
 
+  // 除了正式密码 AUTH_TOKEN，还接受 DEMO_AUTH_TOKEN 作为演示环境专用的第二个密码
   const validTokens = [process.env.AUTH_TOKEN, process.env.DEMO_AUTH_TOKEN].filter(Boolean);
   if (!validTokens.includes(body.password)) {
     return error(401, 'invalid_password');

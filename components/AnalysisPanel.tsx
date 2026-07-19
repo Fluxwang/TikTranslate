@@ -36,6 +36,7 @@ interface Props {
   onStartAnalysis: () => void;
 }
 
+// 复制到剪贴板时把 AI 返回的 Markdown 转成纯文本，逐条正则去掉各种语法标记
 function stripMarkdown(text: string): string {
   return text
     .replace(/#{1,6}\s+/g, "")
@@ -59,7 +60,7 @@ const MD_COMPONENTS: Components = {
       {children}
     </a>
   ),
-  img: () => null,
+  img: () => null, // 刻意过滤掉 AI 输出里的图片，不渲染任何 <img>
 };
 
 const ICONS = {
@@ -222,6 +223,8 @@ const AI_TABS = [
   { id: "ask", label: "追问 AI" },
 ] as const;
 
+// 用 typeof + 索引访问从 AI_TABS 数组本身推导出联合类型，而不是单独再写一遍 "overview" | "structure" | ...，
+// 这样新增/删除 tab 时类型会自动跟着变
 type TabId = (typeof AI_TABS)[number]["id"];
 type CreatorLang = "en" | "es" | "zh";
 
@@ -247,12 +250,14 @@ function creatorReducer(state: CreatorState, action: CreatorAction): CreatorStat
   switch (action.type) {
     case "selectProduct":
       return { ...state, productId: action.productId };
+    // 开始生成时顺带清空上一轮的结果/错误/复制状态，避免旧内容闪一下
     case "startGenerate":
       return { ...state, loading: true, results: null, error: false, copied: false };
     case "generateSuccess":
       return { ...state, loading: false, results: action.results, error: false };
     case "generateError":
       return { ...state, loading: false, results: null, error: true, copied: false };
+    // 切换语言会顺带把"已复制"状态重置——因为复制的是切换前那个语言的内容，切换后应该失效
     case "setLang":
       return { ...state, lang: action.lang, copied: false };
     case "copied":
@@ -378,6 +383,8 @@ function StructureTab({ data }: { data: AnalysisData }) {
 /* ============================================================
    TAB 3 — 爆点话术
    ============================================================ */
+// 用带捕获组的正则 split，分隔符（[方括号]槽位）会被保留在结果数组里，
+// 这样才能把槽位单独包一层 <span> 高亮，同时保留其余普通文本
 function renderSlots(text: string) {
   const parts = text.split(/(\[[^\]]+\])/g);
   return parts.map((p, i) =>
@@ -454,6 +461,8 @@ function CreatorTab({
   products: Product[];
   onSuggest: (product: Product, analysis: SuggestAnalysis) => Promise<SuggestResponse>;
 }) {
+  // useReducer 第三个参数是惰性初始化函数：第二个参数（初始 productId）先传给它，
+  // 它再据此算出真正的初始 state——用来避免每次渲染都重新构造这个初始对象
   const [state, dispatch] = useReducer(creatorReducer, products[0]?.id ?? "", (productId): CreatorState => ({
     productId,
     loading: false,
@@ -494,6 +503,8 @@ function CreatorTab({
       copyTimer.current = window.setTimeout(() => dispatch({ type: "resetCopied" }), 2000);
     };
     if (navigator.clipboard?.writeText) {
+      // done 同时是成功和失败的回调（.then(done, done)）：即使浏览器因权限问题静默拒绝了写入，
+      // UI 上也会显示"已复制"，这是刻意简化，不代表复制一定成功
       navigator.clipboard.writeText(stripMarkdown(currentResult)).then(done, done);
     } else {
       done();
@@ -962,6 +973,9 @@ export default function AnalysisPanel({
             (done ? <StructureTab data={data} /> : <LoadingTab />)}
           {tab === "scripts" &&
             (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
+          {/* 达人建议 tab 不像其他 tab 那样等 done 才渲染真实内容——
+              它内部自己用 canGenerate（analysisPhase === "done"）控制生成按钮是否可点，
+              这样用户可以提前切换过来选好产品，分析一完成就能立刻点生成 */}
           {tab === "creator" &&
             <CreatorTab
               data={data}

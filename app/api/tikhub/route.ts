@@ -31,6 +31,8 @@ function isTikTokUrl(value: unknown): value is string {
   }
 }
 
+// 调试用后门：前端 URL 输入框填 "test1"（大小写不敏感）时不走真实 TikHub 接口，
+// 直接返回 TEST1_VIDEO_URL 环境变量指向的固定视频，方便本地联调不消耗 TikHub 配额
 function resolveDebugVideoAlias(value: unknown) {
   if (typeof value !== 'string' || value.trim().toLowerCase() !== 'test1') return null;
 
@@ -41,6 +43,8 @@ function resolveDebugVideoAlias(value: unknown) {
   };
 }
 
+// 手写的深层取值函数：因为要取的路径是数组变量（下面动态拼出多条不同路径），
+// 没法写成固定的可选链 a?.b?.c，所以用循环逐层安全访问
 function getAtPath(data: unknown, path: string[]) {
   let current = data;
   for (const key of path) {
@@ -104,6 +108,8 @@ export async function POST(req: Request) {
     return error(502, 'tikhub_failed', `TikHub status ${upstream.status}`);
   }
 
+  // 以下字段路径是 TikHub（代理抖音/TikTok 接口）返回结构里的固定位置，
+  // 不是本项目定义的，改动前需要对照 TikHub 文档确认
   const payload = await upstream.json();
   const videoUrls = getAtPath(payload, ['data', 'aweme_detail', 'video', 'play_addr_h264', 'url_list']);
   const uniqueId = getAtPath(payload, ['data', 'aweme_detail', 'author', 'unique_id']);
@@ -121,7 +127,7 @@ export async function POST(req: Request) {
   return json({
     videoUrls,
     author,
-    durationSec: typeof durationMs === 'number' ? durationMs / 1000 : 0,
+    durationSec: typeof durationMs === 'number' ? durationMs / 1000 : 0, // TikHub 返回的时长单位是毫秒
     coverUrl: Array.isArray(coverUrls) && typeof coverUrls[0] === 'string' ? coverUrls[0] : '',
   });
 }

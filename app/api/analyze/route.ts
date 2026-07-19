@@ -41,6 +41,8 @@ type MessageContent =
     }
   >;
 
+// 这 5 个维度名必须和下面 buildPrompt() 里 JSON 示例中的 scores 顺序、
+// 以及前端展示逻辑保持一致——改名字要三处一起改
 const SCORE_DIMS = ['说服力', '钩子强度', '爆款潜力', '转化引导', '视觉演示'];
 
 function json(data: unknown, status = 200) {
@@ -64,6 +66,7 @@ async function readUpstreamError(res: Response) {
   return text ? `LLM status ${res.status}: ${text.slice(0, 1000)}` : `LLM status ${res.status}`;
 }
 
+// 打日志前脱敏，避免 URL 里的 token 或 Authorization 头泄露到日志系统，不要删掉这个步骤
 function sanitizeLogText(value: unknown) {
   return String(value)
     .replace(/token=[^&\s"']+/gi, 'token=[redacted]')
@@ -74,6 +77,8 @@ function parseAnalysis(content: string) {
   try {
     return JSON.parse(content);
   } catch {
+    // LLM 有时不会严格按“只输出 JSON”的指令来，会在前后加解释文字或 Markdown 代码块，
+    // 这里兜底从文本里抠出第一个 {...} 块再解析一次
     const match = content.match(/{[\s\S]*}/);
     if (!match) throw new Error('no json object found');
     return JSON.parse(match[0]);
@@ -99,6 +104,8 @@ function buildTranscript(subtitles: Subtitle[]) {
     .join('\n');
 }
 
+// 这段 prompt 的措辞（字段数量要求、顺序要求、防幻觉规则）经过反复调优，
+// 改动前先想清楚会不会影响 LLM 输出结构，避免下面的 normalize* 函数解析失败
 function buildPrompt(options: {
   transcript: string;
   durationSec: number;
@@ -183,7 +190,7 @@ function buildMessages(prompt: string, videoUrl: string | null): { role: string;
         {
           type: 'video_url',
           video_url: { url: videoUrl },
-          fps: 2,
+          fps: 2, // 抽帧频率：每秒取 2 帧喂给模型，不是逐帧分析
         },
         {
           type: 'text',
@@ -255,6 +262,8 @@ function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse[
     let val = round1(clampNumber(source.val, 0, 10, fallbackVal));
     let pct = Math.round(clampNumber(source.pct, 0, 100, val * 10));
 
+    // 业务规则：纯文本模式下模型根本没看到画面，不能让它给"视觉演示"打高分，
+    // 因此强制把这一项的分数封顶，防止误导用户
     if (clampVisual && dim === '视觉演示') {
       val = Math.min(val, 6.5);
       pct = Math.min(pct, 65);
@@ -364,6 +373,8 @@ async function requestAnalysis(options: {
 
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
+  // 用 err.name 标记错误类型（而不是自定义 Error 子类），POST() 里靠这个
+  // name 区分"JSON 解析失败"和"请求本身失败"，从而决定要不要走文本兜底
   if (typeof content !== 'string') {
     const err = new Error('missing content');
     err.name = 'AnalysisParseError';
@@ -452,6 +463,8 @@ export async function POST(req: Request) {
   let fallbackReason = prepared.fallbackReason;
   let attemptedVideoMode: VideoInputMode = prepared.input?.mode ?? 'none';
 
+  // 整体策略：优先尝试"视频+字幕"分析，任何一步失败（下载失败、LLM 报错、JSON 解析失败）
+  // 都不直接报错给用户，而是静默降级为"纯字幕"分析再试一次；只有两次都失败才真正返回错误
   try {
     if (prepared.input) {
       const videoPrompt = buildPrompt({
@@ -465,6 +478,8 @@ export async function POST(req: Request) {
           prompt: videoPrompt,
           videoUrl: prepared.input.url,
         });
+        // 是否真的"看到了视频"以模型自己在 meta.videoObserved 里的自述为准，
+        // 而不是"我们发了视频过去"就认定——模型可能因为各种原因实际没能读取视频画面
         const rawMeta = isRecord(raw) && isRecord(raw.meta) ? raw.meta : {};
         const videoObserved = rawMeta.videoObserved === true;
 
@@ -509,6 +524,8 @@ export async function POST(req: Request) {
     return error(502, 'llm_failed');
   } finally {
     scheduleTmpVideoDelete(prepared.input?.tmpVideoId);
+    // 注意：这行赋值没有实际作用——上面每条路径都已经 return，函数已经结束，
+    // 这里改变量值不会被任何地方读取到
     attemptedVideoMode = 'none';
   }
 }

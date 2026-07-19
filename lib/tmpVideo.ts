@@ -5,6 +5,8 @@ import net from 'node:net';
 import path from 'node:path';
 
 const DEFAULT_TMP_DIR = '/tmp/tiktranslate-analysis-videos';
+// TTL 决定文件何时被视为“过期”（过期后不可访问、可被清理）；
+// DELETE_DELAY 是另一个独立的定时器，在一次分析请求用完视频后延迟删除文件，两者用途不同，不要合并
 const TMP_VIDEO_TTL_MS = 30 * 60 * 1000;
 const TMP_VIDEO_DELETE_DELAY_MS = 5 * 60 * 1000;
 const DOWNLOAD_TIMEOUT_MS = 20_000;
@@ -56,6 +58,9 @@ function getTmpRoot() {
   return process.env.ANALYSIS_TMP_VIDEO_DIR?.trim() || DEFAULT_TMP_DIR;
 }
 
+// 以下两个函数是 SSRF（服务端请求伪造）防护：视频 URL 来自用户输入，
+// 如果不过滤就直接 fetch，攻击者可以让服务器去请求内网地址（如云厂商的元数据接口）。
+// 不要为了“简化”而删减这些网段判断。
 function isLocalhost(hostname: string) {
   const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
   return host === 'localhost' || host.endsWith('.localhost');
@@ -69,6 +74,8 @@ function isBlockedIp(hostname: string) {
   if (ipVersion === 4) {
     const parts = host.split('.').map((part) => Number.parseInt(part, 10));
     const [a, b] = parts;
+    // 依次屏蔽：0.x（本网段）、10.x/172.16-31.x/192.168.x（私有网段 RFC1918）、
+    // 127.x（回环）、100.64-127.x（运营商级 NAT）、169.254.x（链路本地）
     return (
       a === 0 ||
       a === 10 ||
@@ -142,6 +149,8 @@ function sourceUrlHash(url: string) {
   return createHash('sha256').update(url).digest('hex');
 }
 
+// 边接收边写盘、边累加字节数——不能只信 Content-Length 头（可能缺失或被伪造），
+// 必须在下载过程中实时判断，超限就立刻中止连接，防止恶意大文件把磁盘写满
 async function writeResponseBodyToFile(res: Response, filePath: string) {
   if (!res.body) {
     throw new TmpVideoError('video_download_failed', 'download response body is empty');
@@ -183,6 +192,9 @@ async function writeResponseBodyToFile(res: Response, filePath: string) {
   return total;
 }
 
+// 用 redirect: 'manual' 而不是默认的 'follow'，是因为要对每一跳重定向目标重新做 SSRF 校验；
+// 如果让 fetch 自动跟随重定向，攻击者可以先给一个安全的 URL 通过校验，
+// 再 302 跳转到内网地址，直接绕过上面的 isBlockedIp 检查
 async function fetchDownloadableVideo(url: URL, redirectsRemaining = MAX_REDIRECTS): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
@@ -259,6 +271,8 @@ async function createTmpVideoFromSource(sourceUrl: string, publicOrigin: string)
     throw new TmpVideoError('invalid_video_url', 'video URL is invalid or blocked');
   }
 
+  // id 只是文件目录名（会出现在 URL 路径里），token 才是真正的访问凭证（放在 query 里）；
+  // 两者分开是为了防止别人靠猜 id 就能读到视频——必须同时拿到 token 才行
   const id = randomBytes(16).toString('hex');
   const token = randomBytes(32).toString('hex');
   const root = getTmpRoot();
@@ -339,6 +353,8 @@ export async function prepareServerTmpVideo(videoUrls: unknown, videoIndex: unkn
 }
 
 export async function readTmpVideoMeta(id: string) {
+  // 这不只是格式校验：id 会直接拼进 path.join 里读文件，
+  // 如果不限定成固定长度的十六进制字符串，攻击者可以传 "../../etc/passwd" 之类的值做路径穿越
   if (!/^[a-f0-9]{32}$/.test(id)) return null;
 
   try {
@@ -364,6 +380,7 @@ export async function readTmpVideoMeta(id: string) {
 
 export async function getTmpVideoFile(id: string, token: string | null) {
   const meta = await readTmpVideoMeta(id);
+  // 访问该视频需要同时满足：token 与生成时的 token 一致、且未过期
   if (!meta || token !== meta.token || Date.parse(meta.expiresAt) <= Date.now()) return null;
 
   const filePath = path.join(/* turbopackIgnore: true */ getTmpRoot(), id, meta.fileName);
@@ -404,5 +421,6 @@ export function scheduleTmpVideoDelete(id: string | undefined) {
     ).catch(() => undefined);
   }, TMP_VIDEO_DELETE_DELAY_MS);
 
+  // unref 让这个定时器不阻塞 Node 进程退出——否则进程要等 5 分钟才能优雅关闭
   timer.unref?.();
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 
+// 与 lib/types.ts 里的 Phase 是同一份定义的本地副本，改字段需手动同步
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 
 interface Props {

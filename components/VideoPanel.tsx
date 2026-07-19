@@ -2,6 +2,8 @@
 
 import { useRef } from 'react';
 
+// 与 lib/types.ts 里的 Phase / Subtitle 是同一份定义，这里手写了一份本地副本
+// （历史遗留，未统一 import），改字段时要记得同步过去
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 
 interface Subtitle {
@@ -56,6 +58,8 @@ export default function VideoPanel({
   const trackRef = useRef<HTMLDivElement>(null);
   const pct = duration ? (currentTime / duration) * 100 : 0;
 
+  // 把鼠标点击的绝对坐标换算成进度条上的百分比：(点击位置 - 进度条左边界) / 进度条总宽度，
+  // 再夹在 [0, 1] 之间防止点在条外
   const seekFromEvent = (e: React.MouseEvent) => {
     if (locked) return;
     const el = trackRef.current;
@@ -128,6 +132,8 @@ export default function VideoPanel({
           </div>
 
           {loaded && sub && (
+            // key 里带上 sub.t：字幕切换时 key 变化会让 React 卸载再重新挂载这个节点，
+            // 从而重新触发一次 fade-in 动画，而不是复用旧节点导致动画不重放
             <div className="sub-overlay">
               <div className="src fade-in" key={'s' + sub.t}>{sub.es}</div>
               <div className="dst fade-in" key={'d' + sub.t}>{sub.zh}</div>
@@ -136,6 +142,8 @@ export default function VideoPanel({
         </div>
       </div>
 
+      {/* locked 在字幕识别阶段为 true：识别依赖视频连续播放来对齐音频分片时间戳，
+          这段时间禁止用户暂停/拖动进度条，具体状态机逻辑在 app/page.tsx 里 */}
       <div className="video-controls">
         <button className={`play${loaded && !locked ? '' : ' disabled'}`} disabled={!loaded || locked} onClick={onTogglePlay}>
           {playing ? (

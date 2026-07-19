@@ -24,6 +24,7 @@ function computeOverall(scores: ScoreItem[]): { score: number; label: string } {
   if (scores.length === 0) return { score: 0, label: '—' };
   const avg = scores.reduce((sum, s) => sum + s.val, 0) / scores.length;
   const score = Math.round(avg * 10) / 10;
+  // 8.5 / 7 是评级等级的经验阈值，与后端 app/api/analyze/route.ts 的 computeOverall 保持一致
   const label = score >= 8.5 ? '高复制价值' : score >= 7 ? '有复制价值' : '可参考';
   return { score, label };
 }
@@ -48,6 +49,9 @@ export function adaptAnalysis(raw: AnalyzeResponse, durationSec: number): Analys
   }));
 
   return {
+    // overall/duration 目前后端已经会算，这里的 ?? 只是兜底；
+    // videoStructure/hooks/templates 是后端尚未实现的字段（见 docs/aiAnalysis-backend-todo.md），
+    // 缺失时先给空数组，避免前端渲染时到处判空
     overall: raw.overall ?? computeOverall(scores),
     duration: raw.duration ?? { label: computeDurationLabel(durationSec) },
     sellingPoints,
@@ -92,7 +96,7 @@ export function loadProducts(): Product[] {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) return parsed as Product[];
   } catch {
-    // ignore malformed storage
+    // localStorage 里的数据可能被手动改坏或来自旧版本格式，解析失败就直接静默回退到默认值
   }
   return DEFAULT_PRODUCTS;
 }

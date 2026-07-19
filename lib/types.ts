@@ -1,5 +1,8 @@
 // TikTranslate — shared frontend types
 
+// 两个命名相近但含义不同的状态机，注意不要混用：
+// Phase 管的是"视频解析 + 字幕识别"这条流程，AnalysisPhase 管的是"AI 分析"这条流程，
+// 一个视频进入 recognized 之后才可能触发 AnalysisPhase 从 none 变成 analyzing
 export type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 export type AnalysisPhase = 'none' | 'analyzing' | 'done' | 'failed';
 
@@ -47,6 +50,8 @@ export interface AnalysisMeta {
   analysisMode: 'video_text' | 'text_only';
   videoInputMode: 'test_url' | 'server_tmp_url' | 'none';
   videoObserved: boolean;
+  // 这个联合类型和 lib/tmpVideo.ts 里的 VideoFallbackReason 是同一份枚举，
+  // 但那边是后端专用模块，这里前端类型没有直接 import，改动需要两处手动同步
   videoFallbackReason:
     | null
     | 'no_video_input'
@@ -98,6 +103,8 @@ export interface Product {
   scene: string;
 }
 
+// 和 AnalysisData 字段很像但不是一回事：这里没有 overall/duration/scores，
+// sellingPoints 也是纯字符串数组而非 SellingPoint[]——专门给"达人建议"生成接口用的精简结构
 export interface SuggestAnalysis {
   hooks: HookItem[];
   videoStructure: VideoStructureSegment[];

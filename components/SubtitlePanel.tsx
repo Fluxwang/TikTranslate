@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { fmtTime } from './VideoPanel';
 
+// 与 lib/types.ts 里的 Phase / Subtitle 是同一份定义的本地副本，改字段需手动同步
 type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
 
 interface Subtitle {
@@ -34,6 +35,8 @@ export default function SubtitlePanel({
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
 
+  // 让当前激活的字幕行滚动到列表容器的垂直居中位置：
+  // 目标滚动位置 = 该行相对顶部的偏移 - 容器高度一半 + 行自身高度一半
   useEffect(() => {
     const c = listRef.current, a = activeRef.current;
     if (!c || !a) return;
@@ -42,6 +45,8 @@ export default function SubtitlePanel({
   }, [activeIdx]);
 
   const total = subtitles.length;
+  // 注意：目前 recognizedCount 从父组件传入时恒等于 subtitles.length（即 total），
+  // 所以这里算出来的骨架屏行数恒为 0——是预留给"提前知道总字幕数"场景的逻辑，目前尚未真正启用
   const skeletonCount = phase === 'recognizing' ? Math.min(3, total - recognizedCount) : 0;
 
   return (

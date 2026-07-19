@@ -2,11 +2,11 @@ import { verifyJWT } from '@/lib/auth';
 
 export const maxDuration = 60;
 
-const AUDIO_LIMIT_BYTES = 25 * 1024 * 1024;
-const MAX_SUBTITLE_CHARS = 130;
-const MIN_SUBTITLE_WORDS = 4;
-const LONG_GAP_SECONDS = 0.8;
-const FALLBACK_WORDS_PER_SECOND = 2.6;
+const AUDIO_LIMIT_BYTES = 25 * 1024 * 1024; // Whisper 兼容接口的音频体积上限
+const MAX_SUBTITLE_CHARS = 130; // 单条字幕的目标最大字符数，超过就考虑断句
+const MIN_SUBTITLE_WORDS = 4; // 少于这个词数不会因为标点/停顿就提前断句，避免字幕太碎
+const LONG_GAP_SECONDS = 0.8; // 词与词之间停顿超过这个时长，视为一次自然停顿，可以断句
+const FALLBACK_WORDS_PER_SECOND = 2.6; // 没有真实时间戳时，用这个语速估算字幕时间点（经验值）
 
 type WhisperSegment = {
   start?: number;
@@ -65,6 +65,7 @@ function joinWords(words: string[]) {
   return words.join('').replace(/\s+([,.;:!?])/g, '$1').replace(/\s+/g, ' ').trim();
 }
 
+// 字幕断句的启发式规则（按优先级）：句子说完了 → 词数够且停顿够长 → 太长了刚好在标点处 → 硬性超长兜底
 function shouldEndSubtitle(text: string, wordCount: number, gapToNext: number | null) {
   const hasEnoughWords = wordCount >= MIN_SUBTITLE_WORDS;
   const endsSentence = /[.!?。！？]$/.test(text);
@@ -131,6 +132,8 @@ function splitLongSubtitle(text: string) {
       windowText.lastIndexOf(': '),
     );
     const wordBreakAt = windowText.lastIndexOf(' ');
+    // 标点断点要离窗口末尾够近（超过 45% 位置）才采用，否则宁可用单词边界断，
+    // 避免为了凑标点而切出一条很短、一条很长的不均衡字幕
     const breakAt = punctuationBreakAt > MAX_SUBTITLE_CHARS * 0.45 ? punctuationBreakAt : wordBreakAt;
     const cutAt = breakAt > MAX_SUBTITLE_CHARS * 0.45 ? breakAt + 1 : MAX_SUBTITLE_CHARS;
     parts.push(remaining.slice(0, cutAt).trim());
@@ -220,6 +223,8 @@ function normalizeTranslations(value: unknown, count: number) {
   return translations;
 }
 
+// 翻译策略：先尝试一次性把所有句子打包成一个 JSON 请求（省调用次数），
+// 失败就整体重试一次；仍然失败或某几条返回空，再逐条单独翻译兜底
 async function translateSegments(texts: string[]) {
   if (texts.length === 0) return [];
 
@@ -347,6 +352,8 @@ export async function POST(req: Request) {
   const rawSegments = getSegments(payload, durationSec);
   const texts = rawSegments.map((seg) => (typeof seg.text === 'string' ? seg.text.trim() : '')).filter(Boolean);
   const translations = await translateSegments(texts);
+  // 下面用同一个递增索引对齐 texts 和 rawSegments 过滤后的结果——
+  // 两边的过滤条件必须完全一致（都是"非空文本"），否则译文会对错位置
   let translationIndex = 0;
 
   return json({

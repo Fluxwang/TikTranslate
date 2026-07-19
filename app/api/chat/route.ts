@@ -1,6 +1,6 @@
 import { verifyJWT } from '@/lib/auth';
 
-export const maxDuration = 60;
+export const maxDuration = 60; // Next.js 路由级配置：Serverless 函数最长执行时间（秒），非普通常量
 
 type Message = {
   role: 'user' | 'assistant';
@@ -69,6 +69,7 @@ export async function POST(req: Request) {
         messages: [
           {
             role: 'system',
+            // 注意：body.analysis 是客户端直接传来的数据，未经校验就原样塞进了 system prompt
             content: `你是一位专业的 TikTok 带货话术分析师。请基于字幕和已完成的分析回答用户追问，字幕格式为「时间 原文 / 中文翻译」。回复中文，直接给结论。\n\n字幕：\n${transcript}\n\n分析结果：\n${JSON.stringify(body.analysis ?? {})}`,
           },
           ...history,
