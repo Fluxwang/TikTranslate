@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { fmtTime } from "./VideoPanel";
+import { formatTime } from "@/lib/format";
 
 // 与 lib/types.ts 里的 Phase / Subtitle 是同一份定义的本地副本，改字段需手动同步
 type Phase = "idle" | "parsing" | "loaded" | "recognizing" | "recognized";
@@ -145,7 +145,7 @@ export default function SubtitlePanel({
               className={`sub-row${i === activeIdx ? " active" : ""}`}
               onClick={() => onSeek(s.t)}
             >
-              <span className="ts">{fmtTime(s.t)}</span>
+              <span className="ts">{formatTime(s.t)}</span>
               <div className="lines">
                 <div className="src">{s.es}</div>
                 <div className="dst">{s.zh}</div>
@@ -198,7 +198,7 @@ export default function SubtitlePanel({
             <>
               <span className="dot live" />
               识别中...
-              <span className="mono">{fmtTime(recogClock)}</span>
+              <span className="mono">{formatTime(recogClock)}</span>
               <span className="sub-status-spacer" />
               <button className="sub-action" disabled>
                 识别中

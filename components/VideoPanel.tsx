@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { formatTime } from "@/lib/format";
 
 // 与 lib/types.ts 里的 Phase / Subtitle 是同一份定义，这里手写了一份本地副本
 // （历史遗留，未统一 import），改字段时要记得同步过去
@@ -29,11 +30,6 @@ interface Props {
   onPlayStateChange: (playing: boolean) => void;
   onVideoError: () => void;
   locked: boolean;
-}
-
-function fmtTime(sec: number) {
-  sec = Math.max(0, Math.floor(sec || 0));
-  return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
 }
 
 export default function VideoPanel({
@@ -211,7 +207,7 @@ export default function VideoPanel({
           <div className="knob" style={{ left: pct + "%" }} />
         </div>
         <span className="time">
-          {fmtTime(currentTime)} / {fmtTime(duration)}
+          {formatTime(currentTime)} / {formatTime(duration)}
         </span>
         <button className="vol-btn">
           <svg
@@ -230,5 +226,3 @@ export default function VideoPanel({
     </section>
   );
 }
-
-export { fmtTime };
