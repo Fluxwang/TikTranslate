@@ -1,23 +1,23 @@
-'use client';
+"use client";
 
-import { FormEvent, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [demoHint, setDemoHint] = useState<string | null>(null);
 
   useEffect(() => {
-    if (window.localStorage.getItem('tt_token')) {
-      router.replace('/');
+    if (window.localStorage.getItem("tt_token")) {
+      router.replace("/");
     }
   }, [router]);
 
   useEffect(() => {
-    fetch('/api/demo-hint')
+    fetch("/api/demo-hint")
       .then((r) => r.json() as Promise<{ hint: string | null }>)
       .then((data) => setDemoHint(data.hint))
       .catch(() => {});
@@ -28,23 +28,23 @@ export default function LoginPage() {
     if (!password || pending) return;
 
     setPending(true);
-    setMessage('');
+    setMessage("");
 
     try {
-      const res = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
       });
 
       if (res.ok) {
-        const data = await res.json() as { token: string };
-        window.localStorage.setItem('tt_token', data.token);
-        router.replace('/');
+        const data = (await res.json()) as { token: string };
+        window.localStorage.setItem("tt_token", data.token);
+        router.replace("/");
         return;
       }
 
-      setMessage(res.status === 429 ? '尝试次数过多，请稍后再试' : '密码错误');
+      setMessage(res.status === 429 ? "尝试次数过多，请稍后再试" : "密码错误");
     } finally {
       setPending(false);
     }
@@ -57,7 +57,9 @@ export default function LoginPage() {
           <span className="mark">T</span>
           <b>TikTranslate</b>
         </div>
-        <label className="login-label" htmlFor="password">访问密码</label>
+        <label className="login-label" htmlFor="password">
+          访问密码
+        </label>
         <input
           id="password"
           className="login-input"
@@ -72,8 +74,17 @@ export default function LoginPage() {
           </div>
         )}
         {message && <div className="login-error">{message}</div>}
-        <button className="btn btn-primary login-submit" disabled={!password || pending}>
-          {pending ? <><span className="spinner" /> 登录中</> : '登录'}
+        <button
+          className="btn btn-primary login-submit"
+          disabled={!password || pending}
+        >
+          {pending ? (
+            <>
+              <span className="spinner" /> 登录中
+            </>
+          ) : (
+            "登录"
+          )}
         </button>
       </form>
     </main>
