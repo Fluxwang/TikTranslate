@@ -98,6 +98,12 @@ export function useAnalysis({ authedFetch }: UseAnalysisOptions) {
         setStep(3);
         setErrorMessage("");
         updatePhase("done");
+      } catch (err) {
+        // 网络中断、超时、响应体不是合法 JSON 都会走到这里。不接住的话
+        // phase 会永远停在 analyzing：骨架屏一直转，而幂等锁又挡住了重试，
+        // 用户只能刷新页面。落到 failed 才能让「重新分析」按钮重新可用。
+        setErrorMessage(err instanceof Error ? err.message : "分析请求失败，请重试");
+        updatePhase("failed");
       } finally {
         clearTimers();
       }

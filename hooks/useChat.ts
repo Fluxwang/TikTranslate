@@ -70,6 +70,11 @@ export function useChat({ authedFetch }: UseChatOptions) {
         setThread((items) =>
           items.map((turn, i) => (i === index ? { ...turn, a: data.answer || "" } : turn)),
         );
+      } catch {
+        // 请求抛错（网络中断等）时这一轮的 a 会永远停在 null，UI 上就是
+        // 一条永远「回答中」的消息。写成空字符串至少让它落地成「没有回答」，
+        // 用户能看出这轮失败了并重新提问。
+        setThread((items) => items.map((turn, i) => (i === index ? { ...turn, a: "" } : turn)));
       } finally {
         setPending(false);
       }
