@@ -1,4 +1,7 @@
+import { error, json, unauthorized } from "@/lib/api-error";
 import { verifyJWT } from "@/lib/auth";
+import { getRequiredEnv } from "@/lib/env";
+import { sanitizeLogText } from "@/lib/log";
 import type { AnalysisMeta, AnalyzeResponse } from "@/lib/types";
 import {
   getValidAnalysisTestVideoUrl,
@@ -45,32 +48,9 @@ type MessageContent =
 // 以及前端展示逻辑保持一致——改名字要三处一起改
 const SCORE_DIMS = ["说服力", "钩子强度", "爆款潜力", "转化引导", "视觉演示"];
 
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
-}
-
-function error(status: number, code: string, detail?: string) {
-  return json(detail ? { error: code, detail } : { error: code }, status);
-}
-
-function getRequiredEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
-
 async function readUpstreamError(res: Response) {
   const text = await res.text().catch(() => "");
   return text ? `LLM status ${res.status}: ${text.slice(0, 1000)}` : `LLM status ${res.status}`;
-}
-
-// 打日志前脱敏，避免 URL 里的 token 或 Authorization 头泄露到日志系统，不要删掉这个步骤
-function sanitizeLogText(value: unknown) {
-  return String(value)
-    .replace(/token=[^&\s"']+/gi, "token=[redacted]")
-    .replace(/Bearer\s+[\w.-]+/gi, "Bearer [redacted]");
 }
 
 function parseAnalysis(content: string) {
@@ -450,7 +430,7 @@ export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
+    return unauthorized(err);
   }
 
   let body: AnalyzeRequestBody;

@@ -1,4 +1,6 @@
+import { error, json, unauthorized } from "@/lib/api-error";
 import { verifyJWT } from "@/lib/auth";
+import { getRequiredEnv } from "@/lib/env";
 
 export const maxDuration = 60;
 
@@ -24,22 +26,6 @@ type OpenRouterTranscriptionResponse = {
   segments?: WhisperSegment[];
   words?: WhisperWord[];
 };
-
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
-}
-
-function error(status: number, code: string, detail?: string) {
-  return json(detail ? { error: code, detail } : { error: code }, status);
-}
-
-function getRequiredEnv(name: string) {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`${name} is required`);
-  }
-  return value;
-}
 
 function getAudioFormat(audio: Blob) {
   const mimeType = audio.type.split(";")[0].trim().toLowerCase();
@@ -313,7 +299,7 @@ export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
+    return unauthorized(err);
   }
 
   let form: FormData;

@@ -1,12 +1,5 @@
+import { error, json, unauthorized } from "@/lib/api-error";
 import { verifyJWT } from "@/lib/auth";
-
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
-}
-
-function error(status: number, code: string, detail?: string) {
-  return json(detail ? { error: code, detail } : { error: code }, status);
-}
 
 function isHttpUrl(value: unknown): value is string {
   if (typeof value !== "string" || value.trim().length === 0) return false;
@@ -58,7 +51,7 @@ export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
+    return unauthorized(err);
   }
 
   let body: { url?: unknown };

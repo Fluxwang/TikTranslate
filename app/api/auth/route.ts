@@ -1,3 +1,4 @@
+import { error, json } from "@/lib/api-error";
 import { signJWT } from "@/lib/auth";
 
 // 限流状态存在进程内存里，只对单个实例有效：多实例部署或进程重启后会重置，
@@ -7,14 +8,6 @@ const attempts = new Map<string, { count: number; resetAt: number }>();
 // 15分钟
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
-
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
-}
-
-function error(status: number, code: string, detail?: string) {
-  return json(detail ? { error: code, detail } : { error: code }, status);
-}
 
 // x-forwarded-for 可能是逗号分隔的多级代理链（client, proxy1, proxy2...），取第一个即最初的客户端 IP；
 // 这两个头都是可以被客户端伪造的，能起到的限流效果依赖部署环境本身的反向代理配置是否可信

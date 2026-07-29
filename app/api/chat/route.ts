@@ -1,3 +1,4 @@
+import { error, json, unauthorized } from "@/lib/api-error";
 import { verifyJWT } from "@/lib/auth";
 
 export const maxDuration = 60; // Next.js 路由级配置：Serverless 函数最长执行时间（秒），非普通常量
@@ -13,19 +14,11 @@ type Subtitle = {
   zh: string;
 };
 
-function json(data: unknown, status = 200) {
-  return Response.json(data, { status });
-}
-
-function error(status: number, code: string, detail?: string) {
-  return json(detail ? { error: code, detail } : { error: code }, status);
-}
-
 export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
+    return unauthorized(err);
   }
 
   let body: {
