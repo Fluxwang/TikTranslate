@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
@@ -74,10 +74,7 @@ export default function LoginPage() {
           </div>
         )}
         {message && <div className="login-error">{message}</div>}
-        <button
-          className="btn btn-primary login-submit"
-          disabled={!password || pending}
-        >
+        <button className="btn btn-primary login-submit" disabled={!password || pending}>
           {pending ? (
             <>
               <span className="spinner" /> 登录中
