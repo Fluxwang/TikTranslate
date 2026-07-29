@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const ibmPlexSans = IBM_Plex_Sans({
@@ -30,9 +31,18 @@ export default function RootLayout({
       className={`${ibmPlexSans.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* react-scan 必须在 React 挂载前就执行才能拦截到渲染，所以用 beforeInteractive 策略；
+            直接写原生 <script> 会被 Next 的 no-sync-scripts 规则拦下（它会阻塞首屏解析）。
+            仅在开发环境注入，生产构建不会带上这段。 */}
         {process.env.NODE_ENV === "development" && (
-          <script src="https://unpkg.com/react-scan/dist/auto.global.js" crossOrigin="anonymous" />
-        )}{children}</body>
+          <Script
+            src="https://unpkg.com/react-scan/dist/auto.global.js"
+            strategy="beforeInteractive"
+            crossOrigin="anonymous"
+          />
+        )}
+        {children}
+      </body>
     </html>
   );
 }
