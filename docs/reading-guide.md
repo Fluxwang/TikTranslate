@@ -2,7 +2,15 @@
 
 给第一次接触这个项目的人（包括未来的你）用的读码路线图。按顺序读完，你会对整个项目有一个完整、准确的心智模型。
 
-> 本指南只描述**当前代码的真实状态**（写作于 2026-07-23）。`brief.md` 和 `README.md` 是较早期的设计/介绍文档，部分文件名、接口已经过时——差异已在第 8 节列出，遇到冲突以代码为准。
+> ⚠️ **本文已过期（写于 2026-07-23）**，之后项目经历了一次结构性重构，本指南描述的文件划分大部分已不成立：
+>
+> - `app/page.tsx` 的逻辑已拆入 `hooks/`（10 个领域 hook）
+> - `components/AnalysisPanel.tsx` 已拆为 `components/analysis/` 目录
+> - `app/api/analyze/route.ts` 的 prompt 与规范化逻辑已抽到 `lib/analysis-prompt.ts` / `lib/analysis-schema.ts`
+> - `lib/demo-data.ts` 已删除（零引用死代码）
+> - 新增 `lib/api-error.ts` / `env.ts` / `log.ts` / `url-guard.ts` / `format.ts` 及 Vitest 测试
+>
+> **遇到冲突一律以代码为准。** 各模块的职责与设计取舍现在写在文件头注释里。
 
 ---
 

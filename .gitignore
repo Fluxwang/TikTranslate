@@ -62,3 +62,6 @@ tiktranslate-test.html
 .claude/*
 .github/*
 skills/*
+
+# 面试防守清单（个人学习材料，不入库）
+docs/interview-prep.md

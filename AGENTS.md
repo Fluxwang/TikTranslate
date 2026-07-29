@@ -26,7 +26,13 @@ Naming stays manual: PascalCase component files such as `VideoPanel.tsx`, camelC
 
 ## Testing Guidelines
 
-There is currently no dedicated automated test script. Before opening a PR, run `pnpm lint` and `pnpm build`. For UI or API changes, manually verify the login flow, TikTok URL parsing, transcription start/stop behavior, analysis generation, and follow-up chat. If tests are added, colocate focused unit tests near the affected module or add integration tests under a clearly named `tests/` directory, with names like `analysis.test.ts`.
+Run `pnpm test` (Vitest), `pnpm lint`, and `pnpm build` before opening a PR.
+
+**Scope of automated tests — this is a deliberate boundary, not a gap.** Only the pure functions under `lib/` are unit-tested: they have no dependencies, and they cover the highest-risk logic in the project (normalising untrusted LLM output, SSRF URL filtering). Tests are colocated as `lib/<module>.test.ts`.
+
+Components and hooks are **not** unit-tested. They depend on `MediaRecorder`, `HTMLVideoElement.captureStream()`, and playback timing; mocking those faithfully costs far more than it returns, and a passing test against a hand-rolled mock gives false confidence. They are covered by small, reviewable commits plus manual verification instead.
+
+So for any UI or recording change, manually verify: login flow, TikTok URL parsing, transcription start/stop, analysis generation, and follow-up chat. If E2E tests are added later, put them under a clearly named `tests/` directory.
 
 ## Commit & Pull Request Guidelines
 
