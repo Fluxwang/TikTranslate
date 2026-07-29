@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TopBar from "@/components/TopBar";
 import VideoPanel from "@/components/VideoPanel";
 import SubtitlePanel from "@/components/SubtitlePanel";
-import AnalysisPanel from "@/components/AnalysisPanel";
+import AnalysisPanel from "@/components/analysis/AnalysisPanel";
 import { useAnalysis } from "@/hooks/useAnalysis";
 import { useAuthedFetch, useRequireAuth } from "@/hooks/useAuthedFetch";
 import { useChat } from "@/hooks/useChat";

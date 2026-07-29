@@ -5,6 +5,7 @@
 // lib/analysis-schema.ts 的 normalize* 静默拿到不符合预期的结构。
 // 放在独立文件里，改动一眼可见，也便于 diff 时聚焦。
 
+import { formatTime } from "./format";
 import type { Subtitle } from "./types";
 
 export type MessageContent =
@@ -20,16 +21,6 @@ export type MessageContent =
           text: string;
         }
     >;
-
-/** 秒 → `m:ss`。非法输入一律按 0 处理，保证 prompt 里不会出现 NaN。 */
-export function formatTime(seconds: unknown) {
-  const value = typeof seconds === "number" && Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-  const mins = Math.floor(value / 60);
-  const secs = Math.floor(value % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${mins}:${secs}`;
-}
 
 /** 把字幕数组拼成「[时间] 原文 / 中文」的逐行文本，喂给模型。 */
 export function buildTranscript(subtitles: Subtitle[]) {
