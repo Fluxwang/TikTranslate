@@ -1,8 +1,22 @@
+// POST /api/analyze —— 把整段字幕（可能再加上一段临时托管的视频）交给多模态 LLM，
+// 返回结构化的分析结果。
+//
+// 这个文件只负责编排，三件事分给了三个模块：
+//   - lib/analysis-prompt.ts  prompt 与 messages 的构造
+//   - lib/analysis-schema.ts  LLM 脏输出的解析与规范化
+//   - lib/tmpVideo.ts         把 CDN 视频落到本地临时文件并给出带 token 的公网 URL
+//
+// 核心策略是「两段式降级」：优先「视频 + 字幕」分析，任何一步失败
+// （视频下载失败 / LLM 报错 / JSON 解析失败）都不直接报错给用户，
+// 而是静默退回「纯字幕」分析再试一次，两次都失败才返回错误。
+
 import { error, json, unauthorized } from "@/lib/api-error";
+import { buildMessages, buildPrompt, buildTranscript } from "@/lib/analysis-prompt";
+import { hasCoreFields, isRecord, normalizeAnalysis, parseAnalysis } from "@/lib/analysis-schema";
 import { verifyJWT } from "@/lib/auth";
 import { getRequiredEnv } from "@/lib/env";
 import { sanitizeLogText } from "@/lib/log";
-import type { AnalysisMeta, AnalyzeResponse } from "@/lib/types";
+import type { Subtitle } from "@/lib/types";
 import {
   getValidAnalysisTestVideoUrl,
   getValidPublicAppOrigin,
@@ -17,12 +31,6 @@ import {
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-type Subtitle = {
-  t: number;
-  es: string;
-  zh: string;
-};
-
 type AnalyzeRequestBody = {
   subtitles?: unknown;
   videoUrls?: unknown;
@@ -30,39 +38,9 @@ type AnalyzeRequestBody = {
   durationSec?: unknown;
 };
 
-type MessageContent =
-  | string
-  | Array<
-      | {
-          type: "video_url";
-          video_url: { url: string };
-          fps: number;
-        }
-      | {
-          type: "text";
-          text: string;
-        }
-    >;
-
-// 这 5 个维度名必须和下面 buildPrompt() 里 JSON 示例中的 scores 顺序、
-// 以及前端展示逻辑保持一致——改名字要三处一起改
-const SCORE_DIMS = ["说服力", "钩子强度", "爆款潜力", "转化引导", "视觉演示"];
-
 async function readUpstreamError(res: Response) {
   const text = await res.text().catch(() => "");
   return text ? `LLM status ${res.status}: ${text.slice(0, 1000)}` : `LLM status ${res.status}`;
-}
-
-function parseAnalysis(content: string) {
-  try {
-    return JSON.parse(content);
-  } catch {
-    // LLM 有时不会严格按“只输出 JSON”的指令来，会在前后加解释文字或 Markdown 代码块，
-    // 这里兜底从文本里抠出第一个 {...} 块再解析一次
-    const match = content.match(/{[\s\S]*}/);
-    if (!match) throw new Error("no json object found");
-    return JSON.parse(match[0]);
-  }
 }
 
 function getDurationSec(value: unknown) {
@@ -70,274 +48,12 @@ function getDurationSec(value: unknown) {
   return Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
 
-function formatTime(seconds: unknown) {
-  const value = typeof seconds === "number" && Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
-  const mins = Math.floor(value / 60);
-  const secs = Math.floor(value % 60)
-    .toString()
-    .padStart(2, "0");
-  return `${mins}:${secs}`;
-}
-
-function buildTranscript(subtitles: Subtitle[]) {
-  return subtitles.map((s) => `[${formatTime(s.t)}] ${s.es} / ${s.zh}`).join("\n");
-}
-
-// 这段 prompt 的措辞（字段数量要求、顺序要求、防幻觉规则）经过反复调优，
-// 改动前先想清楚会不会影响 LLM 输出结构，避免下面的 normalize* 函数解析失败
-function buildPrompt(options: { transcript: string; durationSec: number; hasVideo: boolean }) {
-  const modeInstruction = options.hasVideo
-    ? "你收到了视频和字幕。必须结合画面、镜头、产品出现方式、视觉演示和字幕话术分析，不要只分析字幕。"
-    : "你没有收到可用视频。必须基于字幕时间轴完成分析，不能声称看到了画面；视觉演示评分应保守。";
-
-  return `用户是国内电商从业者，目标是拆解海外 TikTok 带货视频。
-${modeInstruction}
-
-字幕格式为「时间 原文 / 中文翻译」。
-视频时长参考：${options.durationSec > 0 ? `${Math.round(options.durationSec)} 秒` : "未知"}。
-
-字幕：
-${options.transcript}
-
-请只输出 JSON，不要输出 Markdown、解释或代码块。JSON 必须符合以下结构和要求：
-{
-  "overall": { "score": 8.7, "label": "高复制价值" },
-  "duration": { "label": "短视频最优区间" },
-  "sellingPoints": ["卖点1", "卖点2", "卖点3"],
-  "scores": [
-    { "dim": "说服力", "val": 8.7, "pct": 87 },
-    { "dim": "钩子强度", "val": 9.2, "pct": 92 },
-    { "dim": "爆款潜力", "val": 8.1, "pct": 81 },
-    { "dim": "转化引导", "val": 8.8, "pct": 88 },
-    { "dim": "视觉演示", "val": 9.0, "pct": 90 }
-  ],
-  "videoStructure": [
-    { "title": "强钩子开场", "time": "0:00-0:05", "desc": "画面/话术做了什么，以及为什么有效。", "tags": ["好奇心缺口", "结果前置"] }
-  ],
-  "hooks": [
-    { "time": "0:00", "src": "原语言字幕或视频话术", "zh": "中文翻译", "tag": "⚡ 开场钩子 - 好奇心缺口" }
-  ],
-  "templates": [
-    { "type": "开场模板", "text": "说真的，自从用了 [产品]，我家就再也没 [旧的麻烦做法] 过了。" }
-  ],
-  "summary": "100-200 字中文摘要。",
-  "suggestedQuestions": ["追问1", "追问2", "追问3"],
-  "meta": {
-    "analysisMode": "${options.hasVideo ? "video_text" : "text_only"}",
-    "videoInputMode": "${options.hasVideo ? "server_tmp_url" : "none"}",
-    "videoObserved": ${options.hasVideo ? "true" : "false"},
-    "videoFallbackReason": null
-  }
-}
-
-字段数量要求：
-- sellingPoints 返回 3-5 条。
-- scores 固定返回 5 维，顺序必须是：说服力、钩子强度、爆款潜力、转化引导、视觉演示。
-- videoStructure 返回 4-6 段，覆盖完整时间线；desc 必须说明画面/话术做了什么以及为什么有效。
-- hooks 返回 4-6 条，按时间顺序；src 必须来自原语言字幕或视频话术，不要编造；zh 必须是中文翻译。
-- templates 返回 4 条，覆盖开场、演示、结果、收口；text 用 [方括号] 标注可替换槽位。
-- suggestedQuestions 返回 3 条。
-- 如果你能基于视频画面进行观察，meta.videoObserved 返回 true。
-- 如果没有收到视频、无法读取视频、只能基于字幕分析，meta.videoObserved 返回 false。
-- 不确定是否看到了视频时，meta.videoObserved 返回 false。
-- 如果视频不可见但有字幕，仍然完成结构化分析，并降低“视觉演示”评分。
-- text-only 模式下 videoStructure 必须基于字幕时间轴描述，不能声称看到画面。`;
-}
-
-function buildMessages(
-  prompt: string,
-  videoUrl: string | null,
-): { role: string; content: MessageContent }[] {
-  const system = {
-    role: "system",
-    content: "你是一位专业的 TikTok 带货视频分析师，只输出 JSON。",
-  };
-
-  if (!videoUrl) {
-    return [system, { role: "user", content: prompt }];
-  }
-
-  return [
-    system,
-    {
-      role: "user",
-      content: [
-        {
-          type: "video_url",
-          video_url: { url: videoUrl },
-          fps: 2, // 抽帧频率：每秒取 2 帧喂给模型，不是逐帧分析
-        },
-        {
-          type: "text",
-          text: prompt,
-        },
-      ],
-    },
-  ];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === "object" && !Array.isArray(value));
-}
-
-function hasCoreFields(value: unknown) {
-  if (!isRecord(value)) return false;
-  return (
-    Array.isArray(value.sellingPoints) &&
-    Array.isArray(value.scores) &&
-    typeof value.summary === "string" &&
-    Array.isArray(value.suggestedQuestions)
-  );
-}
-
-function normalizeStringArray(value: unknown, max: number) {
-  return Array.isArray(value)
-    ? value
-        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
-        .map((item) => item.trim())
-        .slice(0, max)
-    : [];
-}
-
-function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  const number = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
-  if (!Number.isFinite(number)) return fallback;
-  return Math.min(max, Math.max(min, number));
-}
-
-function round1(value: number) {
-  return Math.round(value * 10) / 10;
-}
-
-function computeOverall(scores: AnalyzeResponse["scores"]) {
-  if (scores.length === 0) return { score: 0, label: "可参考" };
-  const score = round1(scores.reduce((sum, item) => sum + item.val, 0) / scores.length);
-  const label = score >= 8.5 ? "高复制价值" : score >= 7 ? "有复制价值" : "可参考";
-  return { score, label };
-}
-
-function computeDurationLabel(durationSec: number) {
-  if (!durationSec) return "—";
-  if (durationSec <= 60) return "短视频最优区间";
-  if (durationSec <= 180) return "中等时长";
-  return "长视频，建议精简";
-}
-
-function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse["scores"] {
-  const rawScores = Array.isArray(value) ? value.filter(isRecord) : [];
-  const numericVals = rawScores
-    .map((item) => clampNumber(item.val, 0, 10, Number.NaN))
-    .filter((item) => Number.isFinite(item));
-  const fallbackVal =
-    numericVals.length > 0
-      ? round1(numericVals.reduce((sum, item) => sum + item, 0) / numericVals.length)
-      : 0;
-
-  return SCORE_DIMS.map((dim, index) => {
-    const byDim = rawScores.find((item) => item.dim === dim);
-    const source = byDim ?? rawScores[index] ?? {};
-    let val = round1(clampNumber(source.val, 0, 10, fallbackVal));
-    let pct = Math.round(clampNumber(source.pct, 0, 100, val * 10));
-
-    // 业务规则：纯文本模式下模型根本没看到画面，不能让它给"视觉演示"打高分，
-    // 因此强制把这一项的分数封顶，防止误导用户
-    if (clampVisual && dim === "视觉演示") {
-      val = Math.min(val, 6.5);
-      pct = Math.min(pct, 65);
-    }
-
-    return { dim, val, pct };
-  });
-}
-
-function normalizeVideoStructure(value: unknown): AnalyzeResponse["videoStructure"] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(isRecord)
-    .map((item) => ({
-      title: typeof item.title === "string" ? item.title : "",
-      time: typeof item.time === "string" ? item.time : "",
-      desc: typeof item.desc === "string" ? item.desc : "",
-      tags: normalizeStringArray(item.tags, 3),
-    }))
-    .filter((item) => item.title || item.desc)
-    .slice(0, 6);
-}
-
-function normalizeHooks(value: unknown): AnalyzeResponse["hooks"] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(isRecord)
-    .map((item) => ({
-      time: typeof item.time === "string" ? item.time : "",
-      src: typeof item.src === "string" ? item.src : "",
-      zh: typeof item.zh === "string" ? item.zh : "",
-      tag: typeof item.tag === "string" ? item.tag : "",
-    }))
-    .filter((item) => item.src || item.zh)
-    .slice(0, 6);
-}
-
-function normalizeTemplates(value: unknown): AnalyzeResponse["templates"] {
-  if (!Array.isArray(value)) return [];
-  return value
-    .filter(isRecord)
-    .map((item) => ({
-      type: typeof item.type === "string" ? item.type : "",
-      text: typeof item.text === "string" ? item.text : "",
-    }))
-    .filter((item) => item.text)
-    .slice(0, 4);
-}
-
-function normalizeAnalysis(
-  raw: unknown,
-  options: {
-    durationSec: number;
-    analysisMode: AnalysisMeta["analysisMode"];
-    videoInputMode: VideoInputMode;
-    videoObserved: boolean;
-    videoFallbackReason: VideoFallbackReason | null;
-  },
-): AnalyzeResponse {
-  const data = isRecord(raw) ? raw : {};
-  const scores = normalizeScores(data.scores, options.analysisMode === "text_only");
-  const fallbackOverall = computeOverall(scores);
-  const rawOverall = isRecord(data.overall) ? data.overall : {};
-  const rawDuration = isRecord(data.duration) ? data.duration : {};
-
-  const meta: AnalysisMeta = {
-    analysisMode: options.analysisMode,
-    videoInputMode: options.videoInputMode,
-    videoObserved: options.analysisMode === "video_text" && options.videoObserved,
-    videoFallbackReason: options.videoFallbackReason,
-  };
-
-  return {
-    overall: {
-      score: round1(clampNumber(rawOverall.score, 0, 10, fallbackOverall.score)),
-      label:
-        typeof rawOverall.label === "string" && rawOverall.label.trim()
-          ? rawOverall.label.trim()
-          : fallbackOverall.label,
-    },
-    duration: {
-      label:
-        typeof rawDuration.label === "string" && rawDuration.label.trim()
-          ? rawDuration.label.trim()
-          : computeDurationLabel(options.durationSec),
-    },
-    sellingPoints: normalizeStringArray(data.sellingPoints, 5),
-    scores,
-    videoStructure: normalizeVideoStructure(data.videoStructure),
-    hooks: normalizeHooks(data.hooks),
-    templates: normalizeTemplates(data.templates),
-    summary: typeof data.summary === "string" ? data.summary.trim() : "",
-    suggestedQuestions: normalizeStringArray(data.suggestedQuestions, 3),
-    meta,
-  };
-}
-
+/**
+ * 调用上游 LLM 并返回已确认「结构可用」的原始对象。
+ *
+ * 用 err.name 标记错误类型（而不是自定义 Error 子类），POST() 里靠这个 name
+ * 区分「JSON 解析失败」和「请求本身失败」，从而给出不同的降级原因码。
+ */
 async function requestAnalysis(options: { prompt: string; videoUrl: string | null }) {
   const baseUrl = getRequiredEnv("ANALYSIS_VIDEO_BASE_URL").replace(/\/$/, "");
   const apiKey = getRequiredEnv("ANALYSIS_VIDEO_API_KEY");
@@ -361,32 +77,43 @@ async function requestAnalysis(options: { prompt: string; videoUrl: string | nul
 
   const data = await res.json();
   const content = data?.choices?.[0]?.message?.content;
-  // 用 err.name 标记错误类型（而不是自定义 Error 子类），POST() 里靠这个
-  // name 区分"JSON 解析失败"和"请求本身失败"，从而决定要不要走文本兜底
   if (typeof content !== "string") {
-    const err = new Error("missing content");
-    err.name = "AnalysisParseError";
-    throw err;
+    throw parseError("missing content");
   }
 
   let parsed: unknown;
   try {
     parsed = parseAnalysis(content);
   } catch (err) {
-    const parseErr = new Error(err instanceof Error ? err.message : "analysis JSON parse failed");
-    parseErr.name = "AnalysisParseError";
-    throw parseErr;
+    throw parseError(err instanceof Error ? err.message : "analysis JSON parse failed");
   }
 
   if (!hasCoreFields(parsed)) {
-    const err = new Error("analysis response missing core fields");
-    err.name = "AnalysisParseError";
-    throw err;
+    throw parseError("analysis response missing core fields");
   }
 
   return parsed;
 }
 
+function parseError(message: string) {
+  const err = new Error(message);
+  err.name = "AnalysisParseError";
+  return err;
+}
+
+function isParseError(err: unknown) {
+  return err instanceof Error && err.name === "AnalysisParseError";
+}
+
+/**
+ * 决定这次分析用哪个视频输入。
+ *
+ * 优先级：ANALYSIS_TEST_VIDEO_URL（本地联调用的固定视频）> 把 TikTok CDN 视频
+ * 下载到服务端临时目录再暴露成带 token 的公网 URL > 没有视频（纯字幕模式）。
+ *
+ * 任何一步失败都不抛错，而是返回 fallbackReason——调用方据此走纯字幕分析，
+ * 并把原因透传给前端展示（用户需要知道为什么这次没有画面分析）。
+ */
 async function selectVideoInput(body: AnalyzeRequestBody): Promise<{
   input: PreparedVideoInput | null;
   fallbackReason: VideoFallbackReason | null;
@@ -449,23 +176,16 @@ export async function POST(req: Request) {
   const durationSec = getDurationSec(body.durationSec);
   const prepared = await selectVideoInput(body);
   let fallbackReason = prepared.fallbackReason;
-  let attemptedVideoMode: VideoInputMode = prepared.input?.mode ?? "none";
+  const attemptedVideoMode: VideoInputMode = prepared.input?.mode ?? "none";
 
-  // 整体策略：优先尝试"视频+字幕"分析，任何一步失败（下载失败、LLM 报错、JSON 解析失败）
-  // 都不直接报错给用户，而是静默降级为"纯字幕"分析再试一次；只有两次都失败才真正返回错误
   try {
     if (prepared.input) {
-      const videoPrompt = buildPrompt({
-        transcript,
-        durationSec,
-        hasVideo: true,
-      });
-
       try {
         const raw = await requestAnalysis({
-          prompt: videoPrompt,
+          prompt: buildPrompt({ transcript, durationSec, hasVideo: true }),
           videoUrl: prepared.input.url,
         });
+
         // 是否真的"看到了视频"以模型自己在 meta.videoObserved 里的自述为准，
         // 而不是"我们发了视频过去"就认定——模型可能因为各种原因实际没能读取视频画面
         const rawMeta = isRecord(raw) && isRecord(raw.meta) ? raw.meta : {};
@@ -481,22 +201,13 @@ export async function POST(req: Request) {
           }),
         );
       } catch (err) {
-        fallbackReason =
-          err instanceof Error && err.name === "AnalysisParseError"
-            ? "qwen_video_json_parse_failed"
-            : "qwen_video_failed";
+        fallbackReason = isParseError(err) ? "qwen_video_json_parse_failed" : "qwen_video_failed";
         console.error("[analyze] video analysis failed:", sanitizeLogText(err));
       }
     }
 
-    const textPrompt = buildPrompt({
-      transcript,
-      durationSec,
-      hasVideo: false,
-    });
-
     const raw = await requestAnalysis({
-      prompt: textPrompt,
+      prompt: buildPrompt({ transcript, durationSec, hasVideo: false }),
       videoUrl: null,
     });
 
@@ -511,14 +222,13 @@ export async function POST(req: Request) {
     );
   } catch (err) {
     console.error("[analyze] text analysis failed:", sanitizeLogText(err));
-    if (err instanceof Error && err.name === "AnalysisParseError") {
+    if (isParseError(err)) {
       return error(500, "analysis_parse_failed");
     }
     return error(502, "llm_failed");
   } finally {
+    // 视频文件在分析结束后延迟删除（而不是立即删）：上游可能还在异步拉取，
+    // 立刻 unlink 会让尚未读完的请求失败。具体延迟见 lib/tmpVideo.ts。
     scheduleTmpVideoDelete(prepared.input?.tmpVideoId);
-    // 注意：这行赋值没有实际作用——上面每条路径都已经 return，函数已经结束，
-    // 这里改变量值不会被任何地方读取到
-    attemptedVideoMode = "none";
   }
 }
