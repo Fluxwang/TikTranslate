@@ -1,8 +1,9 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
-import net from "node:net";
 import path from "node:path";
+
+import { isBlockedIp, isLocalhost, parseHttpUrl } from "./url-guard";
 
 const DEFAULT_TMP_DIR = "/tmp/tiktranslate-analysis-videos";
 // TTL 决定文件何时被视为“过期”（过期后不可访问、可被清理）；
@@ -56,58 +57,6 @@ export class TmpVideoError extends Error {
 
 function getTmpRoot() {
   return process.env.ANALYSIS_TMP_VIDEO_DIR?.trim() || DEFAULT_TMP_DIR;
-}
-
-// 以下两个函数是 SSRF（服务端请求伪造）防护：视频 URL 来自用户输入，
-// 如果不过滤就直接 fetch，攻击者可以让服务器去请求内网地址（如云厂商的元数据接口）。
-// 不要为了“简化”而删减这些网段判断。
-function isLocalhost(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  return host === "localhost" || host.endsWith(".localhost");
-}
-
-function isBlockedIp(hostname: string) {
-  const host = hostname.replace(/^\[|\]$/g, "");
-  const ipVersion = net.isIP(host);
-  if (ipVersion === 0) return false;
-
-  if (ipVersion === 4) {
-    const parts = host.split(".").map((part) => Number.parseInt(part, 10));
-    const [a, b] = parts;
-    // 依次屏蔽：0.x（本网段）、10.x/172.16-31.x/192.168.x（私有网段 RFC1918）、
-    // 127.x（回环）、100.64-127.x（运营商级 NAT）、169.254.x（链路本地）
-    return (
-      a === 0 ||
-      a === 10 ||
-      a === 127 ||
-      (a === 100 && b >= 64 && b <= 127) ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
-    );
-  }
-
-  const normalized = host.toLowerCase();
-  return (
-    normalized === "::" ||
-    normalized === "::1" ||
-    normalized.startsWith("fc") ||
-    normalized.startsWith("fd") ||
-    normalized.startsWith("fe80:")
-  );
-}
-
-function parseHttpUrl(value: string) {
-  let url: URL;
-  try {
-    url = new URL(value);
-  } catch {
-    return null;
-  }
-
-  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
-  if (isLocalhost(url.hostname) || isBlockedIp(url.hostname)) return null;
-  return url;
 }
 
 export function getValidAnalysisTestVideoUrl() {
