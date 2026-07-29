@@ -1,4 +1,4 @@
-import { verifyJWT } from '@/lib/auth';
+import { verifyJWT } from "@/lib/auth";
 
 export const maxDuration = 60;
 
@@ -42,27 +42,33 @@ function getRequiredEnv(name: string) {
 }
 
 function getAudioFormat(audio: Blob) {
-  const mimeType = audio.type.split(';')[0].trim().toLowerCase();
-  const subtype = mimeType.split('/')[1];
+  const mimeType = audio.type.split(";")[0].trim().toLowerCase();
+  const subtype = mimeType.split("/")[1];
 
-  if (!subtype) return 'webm';
-  if (subtype === 'mpeg') return 'mp3';
-  if (subtype === 'mp4') return 'm4a';
-  return subtype.replace(/^x-/, '');
+  if (!subtype) return "webm";
+  if (subtype === "mpeg") return "mp3";
+  if (subtype === "mp4") return "m4a";
+  return subtype.replace(/^x-/, "");
 }
 
 async function blobToBase64(blob: Blob) {
   const buffer = Buffer.from(await blob.arrayBuffer());
-  return buffer.toString('base64');
+  return buffer.toString("base64");
 }
 
 async function readUpstreamError(res: Response) {
-  const text = await res.text().catch(() => '');
-  return text ? `Whisper status ${res.status}: ${text.slice(0, 1000)}` : `Whisper status ${res.status}`;
+  const text = await res.text().catch(() => "");
+  return text
+    ? `Whisper status ${res.status}: ${text.slice(0, 1000)}`
+    : `Whisper status ${res.status}`;
 }
 
 function joinWords(words: string[]) {
-  return words.join(' ').replace(/\s+([,.;:!?])/g, '$1').replace(/\s+/g, ' ').trim();
+  return words
+    .join(" ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // 字幕断句的启发式规则（按优先级）：句子说完了 → 词数够且停顿够长 → 太长了刚好在标点处 → 硬性超长兜底
@@ -79,8 +85,10 @@ function shouldEndSubtitle(text: string, wordCount: number, gapToNext: number | 
 
 function segmentsFromWords(words: WhisperWord[]): WhisperSegment[] {
   const validWords = words.filter(
-    (word): word is Required<Pick<WhisperWord, 'word' | 'start'>> & WhisperWord =>
-      typeof word.word === 'string' && word.word.trim().length > 0 && typeof word.start === 'number',
+    (word): word is Required<Pick<WhisperWord, "word" | "start">> & WhisperWord =>
+      typeof word.word === "string" &&
+      word.word.trim().length > 0 &&
+      typeof word.start === "number",
   );
 
   const segments: WhisperSegment[] = [];
@@ -98,7 +106,7 @@ function segmentsFromWords(words: WhisperWord[]): WhisperSegment[] {
 
     const text = joinWords(currentWords);
     const nextWord = validWords[index + 1];
-    const gapToNext = typeof word.end === 'number' && nextWord ? nextWord.start - word.end : null;
+    const gapToNext = typeof word.end === "number" && nextWord ? nextWord.start - word.end : null;
 
     if (shouldEndSubtitle(text, wordCount, gapToNext)) {
       segments.push({ start, text });
@@ -124,17 +132,18 @@ function splitLongSubtitle(text: string) {
   while (remaining.length > MAX_SUBTITLE_CHARS) {
     const windowText = remaining.slice(0, MAX_SUBTITLE_CHARS);
     const punctuationBreakAt = Math.max(
-      windowText.lastIndexOf('. '),
-      windowText.lastIndexOf('? '),
-      windowText.lastIndexOf('! '),
-      windowText.lastIndexOf(', '),
-      windowText.lastIndexOf('; '),
-      windowText.lastIndexOf(': '),
+      windowText.lastIndexOf(". "),
+      windowText.lastIndexOf("? "),
+      windowText.lastIndexOf("! "),
+      windowText.lastIndexOf(", "),
+      windowText.lastIndexOf("; "),
+      windowText.lastIndexOf(": "),
     );
-    const wordBreakAt = windowText.lastIndexOf(' ');
+    const wordBreakAt = windowText.lastIndexOf(" ");
     // 标点断点要离窗口末尾够近（超过 45% 位置）才采用，否则宁可用单词边界断，
     // 避免为了凑标点而切出一条很短、一条很长的不均衡字幕
-    const breakAt = punctuationBreakAt > MAX_SUBTITLE_CHARS * 0.45 ? punctuationBreakAt : wordBreakAt;
+    const breakAt =
+      punctuationBreakAt > MAX_SUBTITLE_CHARS * 0.45 ? punctuationBreakAt : wordBreakAt;
     const cutAt = breakAt > MAX_SUBTITLE_CHARS * 0.45 ? breakAt + 1 : MAX_SUBTITLE_CHARS;
     parts.push(remaining.slice(0, cutAt).trim());
     remaining = remaining.slice(cutAt).trim();
@@ -173,36 +182,41 @@ function segmentsFromText(text: string, durationSec: number): WhisperSegment[] {
   });
 }
 
-function getSegments(payload: OpenRouterTranscriptionResponse, durationSec: number): WhisperSegment[] {
+function getSegments(
+  payload: OpenRouterTranscriptionResponse,
+  durationSec: number,
+): WhisperSegment[] {
   if (Array.isArray(payload.words) && payload.words.length > 0) {
     const wordSegments = segmentsFromWords(payload.words);
     if (wordSegments.length > 0) return wordSegments;
   }
 
   if (Array.isArray(payload.segments)) {
-    return payload.segments.filter((seg) => typeof seg.text === 'string' && seg.text.trim().length > 0);
+    return payload.segments.filter(
+      (seg) => typeof seg.text === "string" && seg.text.trim().length > 0,
+    );
   }
 
-  const text = typeof payload.text === 'string' ? payload.text.trim() : '';
+  const text = typeof payload.text === "string" ? payload.text.trim() : "";
   return text ? segmentsFromText(text, durationSec) : [];
 }
 
 function parseJsonContent(content: string) {
   const trimmed = content.trim();
-  const withoutFence = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+  const withoutFence = trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
   return JSON.parse(withoutFence);
 }
 
 function pickTranslation(item: unknown) {
-  if (typeof item === 'string') return item;
-  if (!item || typeof item !== 'object') return '';
+  if (typeof item === "string") return item;
+  if (!item || typeof item !== "object") return "";
 
   const { zh, translation } = item as { zh?: unknown; translation?: unknown };
-  return typeof zh === 'string' ? zh : typeof translation === 'string' ? translation : '';
+  return typeof zh === "string" ? zh : typeof translation === "string" ? translation : "";
 }
 
 function normalizeTranslations(value: unknown, count: number) {
-  const translations = Array.from({ length: count }, () => '');
+  const translations = Array.from({ length: count }, () => "");
 
   if (Array.isArray(value)) {
     value.forEach((item, index) => {
@@ -213,7 +227,7 @@ function normalizeTranslations(value: unknown, count: number) {
     return translations;
   }
 
-  if (value && typeof value === 'object') {
+  if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     translations.forEach((_, index) => {
       translations[index] = pickTranslation(record[String(index)]);
@@ -230,23 +244,23 @@ async function translateSegments(texts: string[]) {
 
   const baseUrl = process.env.ANALYSIS_BASE_URL;
   const apiKey = process.env.ANALYSIS_API_KEY;
-  const model = process.env.ANALYSIS_MODEL ?? 'claude-sonnet-4-6';
+  const model = process.env.ANALYSIS_MODEL ?? "claude-sonnet-4-6";
 
   async function requestTranslation(prompt: string) {
     const res = await fetch(`${baseUrl}/chat/completions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey ?? ''}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey ?? ""}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: '你是一个翻译助手，只输出翻译结果，不解释、不补充。' },
-          { role: 'user', content: prompt },
+          { role: "system", content: "你是一个翻译助手，只输出翻译结果，不解释、不补充。" },
+          { role: "user", content: prompt },
         ],
       }),
-      cache: 'no-store',
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -255,8 +269,8 @@ async function translateSegments(texts: string[]) {
 
     const data = await res.json();
     const content = data?.choices?.[0]?.message?.content;
-    if (typeof content !== 'string') {
-      throw new Error('missing translation content');
+    if (typeof content !== "string") {
+      throw new Error("missing translation content");
     }
 
     return content;
@@ -272,14 +286,16 @@ async function translateSegments(texts: string[]) {
 
   async function translateOne(text: string) {
     try {
-      const content = await requestTranslation(`将以下文本翻译成中文，只输出译文，不要解释。\n${text}`);
+      const content = await requestTranslation(
+        `将以下文本翻译成中文，只输出译文，不要解释。\n${text}`,
+      );
       return content.trim();
     } catch {
-      return '';
+      return "";
     }
   }
 
-  let translations = texts.map(() => '');
+  let translations = texts.map(() => "");
   try {
     translations = await batchOnce();
   } catch {
@@ -297,60 +313,62 @@ export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, 'unauthorized', err instanceof Error ? err.message : undefined);
+    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
   }
 
   let form: FormData;
   try {
     form = await req.formData();
   } catch {
-    return error(400, 'missing_audio');
+    return error(400, "missing_audio");
   }
 
-  const audio = form.get('audio');
+  const audio = form.get("audio");
   if (!(audio instanceof Blob)) {
-    return error(400, 'missing_audio');
+    return error(400, "missing_audio");
   }
 
   if (audio.size > AUDIO_LIMIT_BYTES) {
-    return error(413, 'audio_too_large');
+    return error(413, "audio_too_large");
   }
 
-  const startOffset = Number.parseFloat(String(form.get('startOffset') ?? '0'));
-  const durationSec = Number.parseFloat(String(form.get('durationSec') ?? '0'));
+  const startOffset = Number.parseFloat(String(form.get("startOffset") ?? "0"));
+  const durationSec = Number.parseFloat(String(form.get("durationSec") ?? "0"));
 
-  const baseUrl = process.env.WHISPER_BASE_URL ?? 'https://openrouter.ai/api/v1';
+  const baseUrl = process.env.WHISPER_BASE_URL ?? "https://openrouter.ai/api/v1";
   let upstream: Response;
   try {
-    const apiKey = getRequiredEnv('OPENROUTER_API_KEY');
+    const apiKey = getRequiredEnv("OPENROUTER_API_KEY");
     upstream = await fetch(`${baseUrl}/audio/transcriptions`, {
-      method: 'POST',
+      method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.WHISPER_MODEL ?? 'openai/whisper-large-v3-turbo',
+        model: process.env.WHISPER_MODEL ?? "openai/whisper-large-v3-turbo",
         input_audio: {
           data: await blobToBase64(audio),
           format: getAudioFormat(audio),
         },
-        response_format: 'verbose_json',
-        timestamp_granularities: ['word', 'segment'],
+        response_format: "verbose_json",
+        timestamp_granularities: ["word", "segment"],
       }),
-      cache: 'no-store',
+      cache: "no-store",
     });
   } catch (err) {
-    return error(502, 'whisper_failed', err instanceof Error ? err.message : undefined);
+    return error(502, "whisper_failed", err instanceof Error ? err.message : undefined);
   }
 
   if (!upstream.ok) {
-    return error(502, 'whisper_failed', await readUpstreamError(upstream));
+    return error(502, "whisper_failed", await readUpstreamError(upstream));
   }
 
-  const payload = await upstream.json() as OpenRouterTranscriptionResponse;
+  const payload = (await upstream.json()) as OpenRouterTranscriptionResponse;
   const rawSegments = getSegments(payload, durationSec);
-  const texts = rawSegments.map((seg) => (typeof seg.text === 'string' ? seg.text.trim() : '')).filter(Boolean);
+  const texts = rawSegments
+    .map((seg) => (typeof seg.text === "string" ? seg.text.trim() : ""))
+    .filter(Boolean);
   const translations = await translateSegments(texts);
   // 下面用同一个递增索引对齐 texts 和 rawSegments 过滤后的结果——
   // 两边的过滤条件必须完全一致（都是"非空文本"），否则译文会对错位置
@@ -358,13 +376,15 @@ export async function POST(req: Request) {
 
   return json({
     segments: rawSegments
-      .filter((seg) => typeof seg.text === 'string' && seg.text.trim().length > 0)
+      .filter((seg) => typeof seg.text === "string" && seg.text.trim().length > 0)
       .map((seg) => {
-        const zh = translations[translationIndex] ?? '';
+        const zh = translations[translationIndex] ?? "";
         translationIndex++;
         return {
-          t: (typeof seg.start === 'number' ? seg.start : 0) + (Number.isFinite(startOffset) ? startOffset : 0),
-          es: seg.text?.trim() ?? '',
+          t:
+            (typeof seg.start === "number" ? seg.start : 0) +
+            (Number.isFinite(startOffset) ? startOffset : 0),
+          es: seg.text?.trim() ?? "",
           zh,
         };
       }),

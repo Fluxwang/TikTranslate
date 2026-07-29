@@ -3,12 +3,7 @@
 // 两个命名相近但含义不同的状态机，注意不要混用：
 // Phase 管的是"视频解析 + 字幕识别"这条流程，AnalysisPhase 管的是"AI 分析"这条流程，
 // 一个视频进入 recognized 之后才可能触发 AnalysisPhase 从 none 变成 analyzing
-export type Phase =
-  | "idle"
-  | "parsing"
-  | "loaded"
-  | "recognizing"
-  | "recognized";
+export type Phase = "idle" | "parsing" | "loaded" | "recognizing" | "recognized";
 
 export type AnalysisPhase = "none" | "analyzing" | "done" | "failed";
 
@@ -19,13 +14,7 @@ export type Subtitle = {
 };
 
 /** Shared 5-color palette used for selling-point pills and score bars. */
-export type AccentColor =
-  | "purple"
-  | "green"
-  | "orange"
-  | "red"
-  | "blue"
-  | "pink";
+export type AccentColor = "purple" | "green" | "orange" | "red" | "blue" | "pink";
 
 // 卖点文案
 export interface SellingPoint {

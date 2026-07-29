@@ -59,10 +59,9 @@ export async function POST(req: Request) {
   }
 
   // 除了正式密码 AUTH_TOKEN，还接受 DEMO_AUTH_TOKEN 作为演示环境专用的第二个密码
-  const validTokens = [
-    process.env.AUTH_TOKEN,
-    process.env.DEMO_AUTH_TOKEN,
-  ].filter((x) => Boolean(x));
+  const validTokens = [process.env.AUTH_TOKEN, process.env.DEMO_AUTH_TOKEN].filter((x) =>
+    Boolean(x),
+  );
 
   if (!validTokens.includes(body.password)) {
     return error(401, "invalid_password");
@@ -71,10 +70,6 @@ export async function POST(req: Request) {
   try {
     return json({ token: await signJWT() });
   } catch (err) {
-    return error(
-      500,
-      "auth_failed",
-      err instanceof Error ? err.message : undefined,
-    );
+    return error(500, "auth_failed", err instanceof Error ? err.message : undefined);
   }
 }

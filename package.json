@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx,mjs,json,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,mjs,json,css}\"",
     "demo:qwen-video": "node experiments/qwen-video-r2-demo/index.mjs",
     "doctor": "npx react-doctor@latest"
   },
@@ -25,6 +27,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "prettier": "^3.9.6",
     "react-doctor": "^0.5.1",
     "react-scan": "^0.5.7",
     "tailwindcss": "^4",

@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useRef } from 'react';
-import { fmtTime } from './VideoPanel';
+import { useEffect, useRef } from "react";
+import { fmtTime } from "./VideoPanel";
 
 // 与 lib/types.ts 里的 Phase / Subtitle 是同一份定义的本地副本，改字段需手动同步
-type Phase = 'idle' | 'parsing' | 'loaded' | 'recognizing' | 'recognized';
+type Phase = "idle" | "parsing" | "loaded" | "recognizing" | "recognized";
 
 interface Subtitle {
   t: number;
@@ -31,39 +31,59 @@ export default function SubtitlePanel({
   onSeek,
   onStartRecognition,
 }: Props) {
-  const idle = phase === 'idle' || phase === 'parsing';
+  const idle = phase === "idle" || phase === "parsing";
   const listRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<HTMLDivElement>(null);
 
   // 让当前激活的字幕行滚动到列表容器的垂直居中位置：
   // 目标滚动位置 = 该行相对顶部的偏移 - 容器高度一半 + 行自身高度一半
   useEffect(() => {
-    const c = listRef.current, a = activeRef.current;
+    const c = listRef.current,
+      a = activeRef.current;
     if (!c || !a) return;
     const target = a.offsetTop - c.clientHeight / 2 + a.clientHeight / 2;
-    c.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    c.scrollTo({ top: Math.max(0, target), behavior: "smooth" });
   }, [activeIdx]);
 
   const total = subtitles.length;
   // 注意：目前 recognizedCount 从父组件传入时恒等于 subtitles.length（即 total），
   // 所以这里算出来的骨架屏行数恒为 0——是预留给"提前知道总字幕数"场景的逻辑，目前尚未真正启用
-  const skeletonCount = phase === 'recognizing' ? Math.min(3, total - recognizedCount) : 0;
+  const skeletonCount = phase === "recognizing" ? Math.min(3, total - recognizedCount) : 0;
 
   return (
     <section className="col">
       <div className="col-head">
         <span className="label">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            width="14"
+            height="14"
+          >
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
           字幕
         </span>
         <div className="actions">
-          <button className="icon-btn" title="下载字幕 (.srt)"
-            disabled={phase !== 'recognized'} style={phase !== 'recognized' ? { opacity: 0.4 } : undefined}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+          <button
+            className="icon-btn"
+            title="下载字幕 (.srt)"
+            disabled={phase !== "recognized"}
+            style={phase !== "recognized" ? { opacity: 0.4 } : undefined}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              width="15"
+              height="15"
+            >
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
           </button>
         </div>
@@ -72,7 +92,14 @@ export default function SubtitlePanel({
       {idle ? (
         <div className="empty">
           <div className="ei">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              width="18"
+              height="18"
+            >
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
@@ -84,19 +111,30 @@ export default function SubtitlePanel({
           {total === 0 && (
             <div className="empty">
               <div className="ei">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  width="18"
+                  height="18"
+                >
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 </svg>
               </div>
               <div className="et">
-                {phase === 'recognized' ? '未识别到字幕' : phase === 'loaded' ? '待识别' : '等待第一段字幕'}
+                {phase === "recognized"
+                  ? "未识别到字幕"
+                  : phase === "loaded"
+                    ? "待识别"
+                    : "等待第一段字幕"}
               </div>
               <div className="es">
-                {phase === 'recognized'
-                  ? '转写接口已结束，但没有返回可显示的文本。'
-                  : phase === 'loaded'
-                    ? '点击开始识别后，将锁定播放器并从头生成字幕。'
-                    : '视频播放后会按音频分片逐段生成字幕。'}
+                {phase === "recognized"
+                  ? "转写接口已结束，但没有返回可显示的文本。"
+                  : phase === "loaded"
+                    ? "点击开始识别后，将锁定播放器并从头生成字幕。"
+                    : "视频播放后会按音频分片逐段生成字幕。"}
               </div>
             </div>
           )}
@@ -104,7 +142,7 @@ export default function SubtitlePanel({
             <div
               key={i}
               ref={i === activeIdx ? activeRef : null}
-              className={`sub-row${i === activeIdx ? ' active' : ''}`}
+              className={`sub-row${i === activeIdx ? " active" : ""}`}
               onClick={() => onSeek(s.t)}
             >
               <span className="ts">{fmtTime(s.t)}</span>
@@ -115,11 +153,11 @@ export default function SubtitlePanel({
             </div>
           ))}
           {Array.from({ length: skeletonCount }).map((_, i) => (
-            <div className="sk-row" key={'sk' + i}>
+            <div className="sk-row" key={"sk" + i}>
               <span className="ts" />
               <div className="lines" style={{ flex: 1 }}>
-                <div className="sk-line" style={{ width: (70 - i * 12) + '%' }} />
-                <div className="sk-line" style={{ width: (90 - i * 10) + '%' }} />
+                <div className="sk-line" style={{ width: 70 - i * 12 + "%" }} />
+                <div className="sk-line" style={{ width: 90 - i * 10 + "%" }} />
               </div>
             </div>
           ))}
@@ -128,22 +166,33 @@ export default function SubtitlePanel({
 
       {!idle && (
         <div className="sub-status">
-          {phase === 'recognized' ? (
+          {phase === "recognized" ? (
             <>
               <span className="dot done" />
               识别完成
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" width="13" height="13">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                width="13"
+                height="13"
+              >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
               <span className="sub-status-spacer" />
-              <button className="sub-action" disabled>已完成</button>
+              <button className="sub-action" disabled>
+                已完成
+              </button>
             </>
-          ) : phase === 'loaded' ? (
+          ) : phase === "loaded" ? (
             <>
               <span className="dot ready" />
               待识别
               <span className="sub-status-spacer" />
-              <button className="sub-action" onClick={onStartRecognition}>开始识别</button>
+              <button className="sub-action" onClick={onStartRecognition}>
+                开始识别
+              </button>
             </>
           ) : (
             <>
@@ -151,7 +200,9 @@ export default function SubtitlePanel({
               识别中...
               <span className="mono">{fmtTime(recogClock)}</span>
               <span className="sub-status-spacer" />
-              <button className="sub-action" disabled>识别中</button>
+              <button className="sub-action" disabled>
+                识别中
+              </button>
             </>
           )}
         </div>

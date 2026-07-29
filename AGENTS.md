@@ -18,7 +18,11 @@ Use pnpm, as pinned in `package.json`.
 
 ## Coding Style & Naming Conventions
 
-Write TypeScript with `strict` mode in mind. Use functional React components, hooks, and shared types from `lib/types.ts` when data crosses component or API boundaries. Follow the existing style: two-space indentation, single quotes in TS/TSX, semicolons, PascalCase component files such as `VideoPanel.tsx`, and camelCase functions, variables, and route helpers. Import project modules through the `@/*` alias when it improves clarity. Keep global styling in `app/globals.css` and prefer existing design tokens.
+Write TypeScript with `strict` mode in mind. Use functional React components, hooks, and shared types from `lib/types.ts` when data crosses component or API boundaries.
+
+Formatting is enforced by Prettier (`.prettierrc.json`) — run `pnpm format` before committing, or `pnpm format:check` to verify. Do not hand-format; the config is the single source of truth: two-space indentation, **double quotes**, semicolons, trailing commas, 100-column print width.
+
+Naming stays manual: PascalCase component files such as `VideoPanel.tsx`, camelCase functions, variables, and route helpers. Import project modules through the `@/*` alias when it improves clarity. Keep global styling in `app/globals.css` and prefer existing design tokens.
 
 ## Testing Guidelines
 

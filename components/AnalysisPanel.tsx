@@ -141,13 +141,7 @@ const ICONS = {
   ),
 } as const satisfies Record<string, ReactNode>;
 
-function Icon({
-  name,
-  size = 14,
-}: {
-  name: keyof typeof ICONS;
-  size?: number;
-}) {
+function Icon({ name, size = 14 }: { name: keyof typeof ICONS; size?: number }) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -175,11 +169,7 @@ function CardSkeleton({ lines }: { lines: number }) {
   return (
     <div>
       {Array.from({ length: lines }).map((_, i) => (
-        <div
-          className="sk-block"
-          key={i}
-          style={{ width: `${95 - i * 14}%` }}
-        />
+        <div className="sk-block" key={i} style={{ width: `${95 - i * 14}%` }} />
       ))}
     </div>
   );
@@ -195,13 +185,7 @@ function LoadingTab() {
   );
 }
 
-function EmptyTab({
-  title,
-  description,
-}: {
-  title: string;
-  description: string;
-}) {
+function EmptyTab({ title, description }: { title: string; description: string }) {
   return (
     <div className="ai-body">
       <div className="empty">
@@ -284,9 +268,7 @@ function OverviewTab({
       <div className="stat-grid">
         <div className="stat-card enter">
           <div className="cap">综合爆款评分</div>
-          <div className="big accent">
-            {step >= 2 ? data.overall.score.toFixed(1) : "—"}
-          </div>
+          <div className="big accent">{step >= 2 ? data.overall.score.toFixed(1) : "—"}</div>
           <div className="sub">{step >= 2 ? data.overall.label : " "}</div>
         </div>
         <div className="stat-card enter">
@@ -463,14 +445,18 @@ function CreatorTab({
 }) {
   // useReducer 第三个参数是惰性初始化函数：第二个参数（初始 productId）先传给它，
   // 它再据此算出真正的初始 state——用来避免每次渲染都重新构造这个初始对象
-  const [state, dispatch] = useReducer(creatorReducer, products[0]?.id ?? "", (productId): CreatorState => ({
-    productId,
-    loading: false,
-    results: null,
-    lang: "en",
-    error: false,
-    copied: false,
-  }));
+  const [state, dispatch] = useReducer(
+    creatorReducer,
+    products[0]?.id ?? "",
+    (productId): CreatorState => ({
+      productId,
+      loading: false,
+      results: null,
+      lang: "en",
+      error: false,
+      copied: false,
+    }),
+  );
   const copyTimer = useRef<number | null>(null);
 
   // 设置页删了某个产品时，回退到第一个
@@ -641,15 +627,9 @@ function AskTab({
                 <span className="who">AI</span>
                 <div className="ask-msg-body">
                   {m.a == null ? (
-                    <span
-                      className="spinner"
-                      style={{ display: "inline-block" }}
-                    />
+                    <span className="spinner" style={{ display: "inline-block" }} />
                   ) : (
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      components={MD_COMPONENTS}
-                    >
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={MD_COMPONENTS}>
                       {m.a}
                     </ReactMarkdown>
                   )}
@@ -690,10 +670,7 @@ function AskTab({
               }
             }}
           />
-          <button
-            className={`send${val.trim() ? " ready" : ""}`}
-            onClick={() => submit()}
-          >
+          <button className={`send${val.trim() ? " ready" : ""}`} onClick={() => submit()}>
             <Icon name="send" />
           </button>
         </div>
@@ -705,20 +682,12 @@ function AskTab({
 /* ============================================================
    产品设置页（覆盖整个侧栏）
    ============================================================ */
-function ProductCard({
-  product,
-  onSave,
-}: {
-  product: Product;
-  onSave: (p: Product) => void;
-}) {
+function ProductCard({ product, onSave }: { product: Product; onSave: (p: Product) => void }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(product);
 
-  const upd =
-    (k: keyof Product) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+  const upd = (k: keyof Product) => (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
   const startEdit = () => {
     setForm(product);
     setEditing(true);
@@ -738,11 +707,7 @@ function ProductCard({
         <div className="prod-form">
           <div>
             <label className="field-label">Product name</label>
-            <input
-              className="field-input"
-              value={form.name}
-              onChange={upd("name")}
-            />
+            <input className="field-input" value={form.name} onChange={upd("name")} />
           </div>
           <div>
             <label className="field-label">Target audience</label>
@@ -754,9 +719,7 @@ function ProductCard({
             />
           </div>
           <div>
-            <label className="field-label">
-              Core selling points (comma separated)
-            </label>
+            <label className="field-label">Core selling points (comma separated)</label>
             <textarea
               className="field-area"
               rows={3}
@@ -766,12 +729,7 @@ function ProductCard({
           </div>
           <div>
             <label className="field-label">Key usage scenes</label>
-            <textarea
-              className="field-area"
-              rows={2}
-              value={form.scene}
-              onChange={upd("scene")}
-            />
+            <textarea className="field-area" rows={2} value={form.scene} onChange={upd("scene")} />
           </div>
           <div className="prod-actions">
             <button className="btn-sm primary" onClick={save}>
@@ -904,10 +862,7 @@ export default function AnalysisPanel({
               失败
             </span>
           ) : (
-            <span
-              className="beta"
-              style={{ textTransform: "none", whiteSpace: "nowrap" }}
-            >
+            <span className="beta" style={{ textTransform: "none", whiteSpace: "nowrap" }}>
               <Icon name="check" size={11} /> 已完成
             </span>
           )}
@@ -927,9 +882,7 @@ export default function AnalysisPanel({
           <div className="ei">
             <Icon name="sparkles" size={18} />
           </div>
-          <div className="et">
-            {phase === "recognized" ? "字幕已就绪" : "等待字幕识别完成"}
-          </div>
+          <div className="et">{phase === "recognized" ? "字幕已就绪" : "等待字幕识别完成"}</div>
           <div className="es">
             {phase === "recognized"
               ? "点击「开始分析」提取卖点、拆解视频结构并生成达人建议。"
@@ -943,8 +896,7 @@ export default function AnalysisPanel({
           </div>
           <div className="et">分析失败</div>
           <div className="es">
-            {analysisError ||
-              "请检查 ANALYSIS_BASE_URL、ANALYSIS_API_KEY 和模型配置。"}
+            {analysisError || "请检查 ANALYSIS_BASE_URL、ANALYSIS_API_KEY 和模型配置。"}
           </div>
         </div>
       ) : (
@@ -963,34 +915,24 @@ export default function AnalysisPanel({
           </div>
 
           {tab === "overview" && (
-            <OverviewTab
-              data={data}
-              durationSec={durationSec}
-              step={analysisStep}
-            />
+            <OverviewTab data={data} durationSec={durationSec} step={analysisStep} />
           )}
-          {tab === "structure" &&
-            (done ? <StructureTab data={data} /> : <LoadingTab />)}
-          {tab === "scripts" &&
-            (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
+          {tab === "structure" && (done ? <StructureTab data={data} /> : <LoadingTab />)}
+          {tab === "scripts" && (done ? <ScriptsTab data={data} /> : <LoadingTab />)}
           {/* 达人建议 tab 不像其他 tab 那样等 done 才渲染真实内容——
               它内部自己用 canGenerate（analysisPhase === "done"）控制生成按钮是否可点，
               这样用户可以提前切换过来选好产品，分析一完成就能立刻点生成 */}
-          {tab === "creator" &&
+          {tab === "creator" && (
             <CreatorTab
               data={data}
               analysisPhase={analysisPhase}
               products={products}
               onSuggest={onSuggest}
-            />}
+            />
+          )}
           {tab === "ask" &&
             (done ? (
-              <AskTab
-                data={data}
-                thread={thread}
-                onSend={onSend}
-                pending={askPending}
-              />
+              <AskTab data={data} thread={thread} onSend={onSend} pending={askPending} />
             ) : (
               <LoadingTab />
             ))}

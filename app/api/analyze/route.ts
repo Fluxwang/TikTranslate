@@ -1,5 +1,5 @@
-import { verifyJWT } from '@/lib/auth';
-import type { AnalysisMeta, AnalyzeResponse } from '@/lib/types';
+import { verifyJWT } from "@/lib/auth";
+import type { AnalysisMeta, AnalyzeResponse } from "@/lib/types";
 import {
   getValidAnalysisTestVideoUrl,
   getValidPublicAppOrigin,
@@ -9,9 +9,9 @@ import {
   type PreparedVideoInput,
   type VideoFallbackReason,
   type VideoInputMode,
-} from '@/lib/tmpVideo';
+} from "@/lib/tmpVideo";
 
-export const runtime = 'nodejs';
+export const runtime = "nodejs";
 export const maxDuration = 120;
 
 type Subtitle = {
@@ -30,20 +30,20 @@ type AnalyzeRequestBody = {
 type MessageContent =
   | string
   | Array<
-    | {
-      type: 'video_url';
-      video_url: { url: string };
-      fps: number;
-    }
-    | {
-      type: 'text';
-      text: string;
-    }
-  >;
+      | {
+          type: "video_url";
+          video_url: { url: string };
+          fps: number;
+        }
+      | {
+          type: "text";
+          text: string;
+        }
+    >;
 
 // 这 5 个维度名必须和下面 buildPrompt() 里 JSON 示例中的 scores 顺序、
 // 以及前端展示逻辑保持一致——改名字要三处一起改
-const SCORE_DIMS = ['说服力', '钩子强度', '爆款潜力', '转化引导', '视觉演示'];
+const SCORE_DIMS = ["说服力", "钩子强度", "爆款潜力", "转化引导", "视觉演示"];
 
 function json(data: unknown, status = 200) {
   return Response.json(data, { status });
@@ -62,15 +62,15 @@ function getRequiredEnv(name: string) {
 }
 
 async function readUpstreamError(res: Response) {
-  const text = await res.text().catch(() => '');
+  const text = await res.text().catch(() => "");
   return text ? `LLM status ${res.status}: ${text.slice(0, 1000)}` : `LLM status ${res.status}`;
 }
 
 // 打日志前脱敏，避免 URL 里的 token 或 Authorization 头泄露到日志系统，不要删掉这个步骤
 function sanitizeLogText(value: unknown) {
   return String(value)
-    .replace(/token=[^&\s"']+/gi, 'token=[redacted]')
-    .replace(/Bearer\s+[\w.-]+/gi, 'Bearer [redacted]');
+    .replace(/token=[^&\s"']+/gi, "token=[redacted]")
+    .replace(/Bearer\s+[\w.-]+/gi, "Bearer [redacted]");
 }
 
 function parseAnalysis(content: string) {
@@ -80,46 +80,41 @@ function parseAnalysis(content: string) {
     // LLM 有时不会严格按“只输出 JSON”的指令来，会在前后加解释文字或 Markdown 代码块，
     // 这里兜底从文本里抠出第一个 {...} 块再解析一次
     const match = content.match(/{[\s\S]*}/);
-    if (!match) throw new Error('no json object found');
+    if (!match) throw new Error("no json object found");
     return JSON.parse(match[0]);
   }
 }
 
-
 function getDurationSec(value: unknown) {
-  const duration = typeof value === 'number' ? value : Number.parseFloat(String(value ?? '0'));
+  const duration = typeof value === "number" ? value : Number.parseFloat(String(value ?? "0"));
   return Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
 
 function formatTime(seconds: unknown) {
-  const value = typeof seconds === 'number' && Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
+  const value = typeof seconds === "number" && Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
   const mins = Math.floor(value / 60);
-  const secs = Math.floor(value % 60).toString().padStart(2, '0');
+  const secs = Math.floor(value % 60)
+    .toString()
+    .padStart(2, "0");
   return `${mins}:${secs}`;
 }
 
 function buildTranscript(subtitles: Subtitle[]) {
-  return subtitles
-    .map((s) => `[${formatTime(s.t)}] ${s.es} / ${s.zh}`)
-    .join('\n');
+  return subtitles.map((s) => `[${formatTime(s.t)}] ${s.es} / ${s.zh}`).join("\n");
 }
 
 // 这段 prompt 的措辞（字段数量要求、顺序要求、防幻觉规则）经过反复调优，
 // 改动前先想清楚会不会影响 LLM 输出结构，避免下面的 normalize* 函数解析失败
-function buildPrompt(options: {
-  transcript: string;
-  durationSec: number;
-  hasVideo: boolean;
-}) {
+function buildPrompt(options: { transcript: string; durationSec: number; hasVideo: boolean }) {
   const modeInstruction = options.hasVideo
-    ? '你收到了视频和字幕。必须结合画面、镜头、产品出现方式、视觉演示和字幕话术分析，不要只分析字幕。'
-    : '你没有收到可用视频。必须基于字幕时间轴完成分析，不能声称看到了画面；视觉演示评分应保守。';
+    ? "你收到了视频和字幕。必须结合画面、镜头、产品出现方式、视觉演示和字幕话术分析，不要只分析字幕。"
+    : "你没有收到可用视频。必须基于字幕时间轴完成分析，不能声称看到了画面；视觉演示评分应保守。";
 
   return `用户是国内电商从业者，目标是拆解海外 TikTok 带货视频。
 ${modeInstruction}
 
 字幕格式为「时间 原文 / 中文翻译」。
-视频时长参考：${options.durationSec > 0 ? `${Math.round(options.durationSec)} 秒` : '未知'}。
+视频时长参考：${options.durationSec > 0 ? `${Math.round(options.durationSec)} 秒` : "未知"}。
 
 字幕：
 ${options.transcript}
@@ -148,9 +143,9 @@ ${options.transcript}
   "summary": "100-200 字中文摘要。",
   "suggestedQuestions": ["追问1", "追问2", "追问3"],
   "meta": {
-    "analysisMode": "${options.hasVideo ? 'video_text' : 'text_only'}",
-    "videoInputMode": "${options.hasVideo ? 'server_tmp_url' : 'none'}",
-    "videoObserved": ${options.hasVideo ? 'true' : 'false'},
+    "analysisMode": "${options.hasVideo ? "video_text" : "text_only"}",
+    "videoInputMode": "${options.hasVideo ? "server_tmp_url" : "none"}",
+    "videoObserved": ${options.hasVideo ? "true" : "false"},
     "videoFallbackReason": null
   }
 }
@@ -169,31 +164,31 @@ ${options.transcript}
 - text-only 模式下 videoStructure 必须基于字幕时间轴描述，不能声称看到画面。`;
 }
 
-function buildMessages(prompt: string, videoUrl: string | null): { role: string; content: MessageContent }[] {
+function buildMessages(
+  prompt: string,
+  videoUrl: string | null,
+): { role: string; content: MessageContent }[] {
   const system = {
-    role: 'system',
-    content: '你是一位专业的 TikTok 带货视频分析师，只输出 JSON。',
+    role: "system",
+    content: "你是一位专业的 TikTok 带货视频分析师，只输出 JSON。",
   };
 
   if (!videoUrl) {
-    return [
-      system,
-      { role: 'user', content: prompt },
-    ];
+    return [system, { role: "user", content: prompt }];
   }
 
   return [
     system,
     {
-      role: 'user',
+      role: "user",
       content: [
         {
-          type: 'video_url',
+          type: "video_url",
           video_url: { url: videoUrl },
           fps: 2, // 抽帧频率：每秒取 2 帧喂给模型，不是逐帧分析
         },
         {
-          type: 'text',
+          type: "text",
           text: prompt,
         },
       ],
@@ -202,7 +197,7 @@ function buildMessages(prompt: string, videoUrl: string | null): { role: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function hasCoreFields(value: unknown) {
@@ -210,21 +205,22 @@ function hasCoreFields(value: unknown) {
   return (
     Array.isArray(value.sellingPoints) &&
     Array.isArray(value.scores) &&
-    typeof value.summary === 'string' &&
+    typeof value.summary === "string" &&
     Array.isArray(value.suggestedQuestions)
   );
 }
 
 function normalizeStringArray(value: unknown, max: number) {
   return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
-      .map((item) => item.trim())
-      .slice(0, max)
+    ? value
+        .filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+        .map((item) => item.trim())
+        .slice(0, max)
     : [];
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
-  const number = typeof value === 'number' ? value : Number.parseFloat(String(value ?? ''));
+  const number = typeof value === "number" ? value : Number.parseFloat(String(value ?? ""));
   if (!Number.isFinite(number)) return fallback;
   return Math.min(max, Math.max(min, number));
 }
@@ -233,28 +229,29 @@ function round1(value: number) {
   return Math.round(value * 10) / 10;
 }
 
-function computeOverall(scores: AnalyzeResponse['scores']) {
-  if (scores.length === 0) return { score: 0, label: '可参考' };
+function computeOverall(scores: AnalyzeResponse["scores"]) {
+  if (scores.length === 0) return { score: 0, label: "可参考" };
   const score = round1(scores.reduce((sum, item) => sum + item.val, 0) / scores.length);
-  const label = score >= 8.5 ? '高复制价值' : score >= 7 ? '有复制价值' : '可参考';
+  const label = score >= 8.5 ? "高复制价值" : score >= 7 ? "有复制价值" : "可参考";
   return { score, label };
 }
 
 function computeDurationLabel(durationSec: number) {
-  if (!durationSec) return '—';
-  if (durationSec <= 60) return '短视频最优区间';
-  if (durationSec <= 180) return '中等时长';
-  return '长视频，建议精简';
+  if (!durationSec) return "—";
+  if (durationSec <= 60) return "短视频最优区间";
+  if (durationSec <= 180) return "中等时长";
+  return "长视频，建议精简";
 }
 
-function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse['scores'] {
+function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse["scores"] {
   const rawScores = Array.isArray(value) ? value.filter(isRecord) : [];
   const numericVals = rawScores
     .map((item) => clampNumber(item.val, 0, 10, Number.NaN))
     .filter((item) => Number.isFinite(item));
-  const fallbackVal = numericVals.length > 0
-    ? round1(numericVals.reduce((sum, item) => sum + item, 0) / numericVals.length)
-    : 0;
+  const fallbackVal =
+    numericVals.length > 0
+      ? round1(numericVals.reduce((sum, item) => sum + item, 0) / numericVals.length)
+      : 0;
 
   return SCORE_DIMS.map((dim, index) => {
     const byDim = rawScores.find((item) => item.dim === dim);
@@ -264,7 +261,7 @@ function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse[
 
     // 业务规则：纯文本模式下模型根本没看到画面，不能让它给"视觉演示"打高分，
     // 因此强制把这一项的分数封顶，防止误导用户
-    if (clampVisual && dim === '视觉演示') {
+    if (clampVisual && dim === "视觉演示") {
       val = Math.min(val, 6.5);
       pct = Math.min(pct, 65);
     }
@@ -273,46 +270,58 @@ function normalizeScores(value: unknown, clampVisual: boolean): AnalyzeResponse[
   });
 }
 
-function normalizeVideoStructure(value: unknown): AnalyzeResponse['videoStructure'] {
+function normalizeVideoStructure(value: unknown): AnalyzeResponse["videoStructure"] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isRecord).map((item) => ({
-    title: typeof item.title === 'string' ? item.title : '',
-    time: typeof item.time === 'string' ? item.time : '',
-    desc: typeof item.desc === 'string' ? item.desc : '',
-    tags: normalizeStringArray(item.tags, 3),
-  })).filter((item) => item.title || item.desc).slice(0, 6);
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      title: typeof item.title === "string" ? item.title : "",
+      time: typeof item.time === "string" ? item.time : "",
+      desc: typeof item.desc === "string" ? item.desc : "",
+      tags: normalizeStringArray(item.tags, 3),
+    }))
+    .filter((item) => item.title || item.desc)
+    .slice(0, 6);
 }
 
-function normalizeHooks(value: unknown): AnalyzeResponse['hooks'] {
+function normalizeHooks(value: unknown): AnalyzeResponse["hooks"] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isRecord).map((item) => ({
-    time: typeof item.time === 'string' ? item.time : '',
-    src: typeof item.src === 'string' ? item.src : '',
-    zh: typeof item.zh === 'string' ? item.zh : '',
-    tag: typeof item.tag === 'string' ? item.tag : '',
-  })).filter((item) => item.src || item.zh).slice(0, 6);
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      time: typeof item.time === "string" ? item.time : "",
+      src: typeof item.src === "string" ? item.src : "",
+      zh: typeof item.zh === "string" ? item.zh : "",
+      tag: typeof item.tag === "string" ? item.tag : "",
+    }))
+    .filter((item) => item.src || item.zh)
+    .slice(0, 6);
 }
 
-function normalizeTemplates(value: unknown): AnalyzeResponse['templates'] {
+function normalizeTemplates(value: unknown): AnalyzeResponse["templates"] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isRecord).map((item) => ({
-    type: typeof item.type === 'string' ? item.type : '',
-    text: typeof item.text === 'string' ? item.text : '',
-  })).filter((item) => item.text).slice(0, 4);
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      type: typeof item.type === "string" ? item.type : "",
+      text: typeof item.text === "string" ? item.text : "",
+    }))
+    .filter((item) => item.text)
+    .slice(0, 4);
 }
 
 function normalizeAnalysis(
   raw: unknown,
   options: {
     durationSec: number;
-    analysisMode: AnalysisMeta['analysisMode'];
+    analysisMode: AnalysisMeta["analysisMode"];
     videoInputMode: VideoInputMode;
     videoObserved: boolean;
     videoFallbackReason: VideoFallbackReason | null;
   },
 ): AnalyzeResponse {
   const data = isRecord(raw) ? raw : {};
-  const scores = normalizeScores(data.scores, options.analysisMode === 'text_only');
+  const scores = normalizeScores(data.scores, options.analysisMode === "text_only");
   const fallbackOverall = computeOverall(scores);
   const rawOverall = isRecord(data.overall) ? data.overall : {};
   const rawDuration = isRecord(data.duration) ? data.duration : {};
@@ -320,51 +329,50 @@ function normalizeAnalysis(
   const meta: AnalysisMeta = {
     analysisMode: options.analysisMode,
     videoInputMode: options.videoInputMode,
-    videoObserved: options.analysisMode === 'video_text' && options.videoObserved,
+    videoObserved: options.analysisMode === "video_text" && options.videoObserved,
     videoFallbackReason: options.videoFallbackReason,
   };
 
   return {
     overall: {
       score: round1(clampNumber(rawOverall.score, 0, 10, fallbackOverall.score)),
-      label: typeof rawOverall.label === 'string' && rawOverall.label.trim()
-        ? rawOverall.label.trim()
-        : fallbackOverall.label,
+      label:
+        typeof rawOverall.label === "string" && rawOverall.label.trim()
+          ? rawOverall.label.trim()
+          : fallbackOverall.label,
     },
     duration: {
-      label: typeof rawDuration.label === 'string' && rawDuration.label.trim()
-        ? rawDuration.label.trim()
-        : computeDurationLabel(options.durationSec),
+      label:
+        typeof rawDuration.label === "string" && rawDuration.label.trim()
+          ? rawDuration.label.trim()
+          : computeDurationLabel(options.durationSec),
     },
     sellingPoints: normalizeStringArray(data.sellingPoints, 5),
     scores,
     videoStructure: normalizeVideoStructure(data.videoStructure),
     hooks: normalizeHooks(data.hooks),
     templates: normalizeTemplates(data.templates),
-    summary: typeof data.summary === 'string' ? data.summary.trim() : '',
+    summary: typeof data.summary === "string" ? data.summary.trim() : "",
     suggestedQuestions: normalizeStringArray(data.suggestedQuestions, 3),
     meta,
   };
 }
 
-async function requestAnalysis(options: {
-  prompt: string;
-  videoUrl: string | null;
-}) {
-  const baseUrl = getRequiredEnv('ANALYSIS_VIDEO_BASE_URL').replace(/\/$/, '');
-  const apiKey = getRequiredEnv('ANALYSIS_VIDEO_API_KEY');
+async function requestAnalysis(options: { prompt: string; videoUrl: string | null }) {
+  const baseUrl = getRequiredEnv("ANALYSIS_VIDEO_BASE_URL").replace(/\/$/, "");
+  const apiKey = getRequiredEnv("ANALYSIS_VIDEO_API_KEY");
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
+    method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.ANALYSIS_VIDEO_MODEL ?? 'qwen3.7-plus',
+      model: process.env.ANALYSIS_VIDEO_MODEL ?? "qwen3.7-plus",
       messages: buildMessages(options.prompt, options.videoUrl),
     }),
-    cache: 'no-store',
+    cache: "no-store",
   });
 
   if (!res.ok) {
@@ -375,9 +383,9 @@ async function requestAnalysis(options: {
   const content = data?.choices?.[0]?.message?.content;
   // 用 err.name 标记错误类型（而不是自定义 Error 子类），POST() 里靠这个
   // name 区分"JSON 解析失败"和"请求本身失败"，从而决定要不要走文本兜底
-  if (typeof content !== 'string') {
-    const err = new Error('missing content');
-    err.name = 'AnalysisParseError';
+  if (typeof content !== "string") {
+    const err = new Error("missing content");
+    err.name = "AnalysisParseError";
     throw err;
   }
 
@@ -385,14 +393,14 @@ async function requestAnalysis(options: {
   try {
     parsed = parseAnalysis(content);
   } catch (err) {
-    const parseErr = new Error(err instanceof Error ? err.message : 'analysis JSON parse failed');
-    parseErr.name = 'AnalysisParseError';
+    const parseErr = new Error(err instanceof Error ? err.message : "analysis JSON parse failed");
+    parseErr.name = "AnalysisParseError";
     throw parseErr;
   }
 
   if (!hasCoreFields(parsed)) {
-    const err = new Error('analysis response missing core fields');
-    err.name = 'AnalysisParseError';
+    const err = new Error("analysis response missing core fields");
+    err.name = "AnalysisParseError";
     throw err;
   }
 
@@ -406,7 +414,7 @@ async function selectVideoInput(body: AnalyzeRequestBody): Promise<{
   const testVideo = getValidAnalysisTestVideoUrl();
   if (testVideo.url) {
     return {
-      input: { url: testVideo.url, mode: 'test_url' },
+      input: { url: testVideo.url, mode: "test_url" },
       fallbackReason: null,
     };
   }
@@ -415,7 +423,7 @@ async function selectVideoInput(body: AnalyzeRequestBody): Promise<{
   }
 
   if (!Array.isArray(body.videoUrls) || body.videoUrls.length === 0) {
-    return { input: null, fallbackReason: 'no_video_input' };
+    return { input: null, fallbackReason: "no_video_input" };
   }
 
   const publicOrigin = getValidPublicAppOrigin();
@@ -430,11 +438,11 @@ async function selectVideoInput(body: AnalyzeRequestBody): Promise<{
     };
   } catch (err) {
     if (err instanceof TmpVideoError) {
-      console.error('[analyze] tmp video preparation failed:', sanitizeLogText(err.message));
+      console.error("[analyze] tmp video preparation failed:", sanitizeLogText(err.message));
       return { input: null, fallbackReason: err.reason };
     }
-    console.error('[analyze] tmp video preparation failed:', sanitizeLogText(err));
-    return { input: null, fallbackReason: 'tmp_video_url_unavailable' };
+    console.error("[analyze] tmp video preparation failed:", sanitizeLogText(err));
+    return { input: null, fallbackReason: "tmp_video_url_unavailable" };
   }
 }
 
@@ -442,18 +450,18 @@ export async function POST(req: Request) {
   try {
     await verifyJWT(req);
   } catch (err) {
-    return error(401, 'unauthorized', err instanceof Error ? err.message : undefined);
+    return error(401, "unauthorized", err instanceof Error ? err.message : undefined);
   }
 
   let body: AnalyzeRequestBody;
   try {
     body = await req.json();
   } catch {
-    return error(400, 'missing_subtitles');
+    return error(400, "missing_subtitles");
   }
 
   if (!Array.isArray(body.subtitles) || body.subtitles.length === 0) {
-    return error(400, 'missing_subtitles');
+    return error(400, "missing_subtitles");
   }
 
   const subtitles = body.subtitles as Subtitle[];
@@ -461,7 +469,7 @@ export async function POST(req: Request) {
   const durationSec = getDurationSec(body.durationSec);
   const prepared = await selectVideoInput(body);
   let fallbackReason = prepared.fallbackReason;
-  let attemptedVideoMode: VideoInputMode = prepared.input?.mode ?? 'none';
+  let attemptedVideoMode: VideoInputMode = prepared.input?.mode ?? "none";
 
   // 整体策略：优先尝试"视频+字幕"分析，任何一步失败（下载失败、LLM 报错、JSON 解析失败）
   // 都不直接报错给用户，而是静默降级为"纯字幕"分析再试一次；只有两次都失败才真正返回错误
@@ -483,18 +491,21 @@ export async function POST(req: Request) {
         const rawMeta = isRecord(raw) && isRecord(raw.meta) ? raw.meta : {};
         const videoObserved = rawMeta.videoObserved === true;
 
-        return json(normalizeAnalysis(raw, {
-          durationSec,
-          analysisMode: videoObserved ? 'video_text' : 'text_only',
-          videoInputMode: prepared.input.mode,
-          videoObserved,
-          videoFallbackReason: videoObserved ? null : 'qwen_video_not_observed',
-        }));
+        return json(
+          normalizeAnalysis(raw, {
+            durationSec,
+            analysisMode: videoObserved ? "video_text" : "text_only",
+            videoInputMode: prepared.input.mode,
+            videoObserved,
+            videoFallbackReason: videoObserved ? null : "qwen_video_not_observed",
+          }),
+        );
       } catch (err) {
-        fallbackReason = err instanceof Error && err.name === 'AnalysisParseError'
-          ? 'qwen_video_json_parse_failed'
-          : 'qwen_video_failed';
-        console.error('[analyze] video analysis failed:', sanitizeLogText(err));
+        fallbackReason =
+          err instanceof Error && err.name === "AnalysisParseError"
+            ? "qwen_video_json_parse_failed"
+            : "qwen_video_failed";
+        console.error("[analyze] video analysis failed:", sanitizeLogText(err));
       }
     }
 
@@ -509,23 +520,25 @@ export async function POST(req: Request) {
       videoUrl: null,
     });
 
-    return json(normalizeAnalysis(raw, {
-      durationSec,
-      analysisMode: 'text_only',
-      videoInputMode: attemptedVideoMode,
-      videoObserved: false,
-      videoFallbackReason: fallbackReason,
-    }));
+    return json(
+      normalizeAnalysis(raw, {
+        durationSec,
+        analysisMode: "text_only",
+        videoInputMode: attemptedVideoMode,
+        videoObserved: false,
+        videoFallbackReason: fallbackReason,
+      }),
+    );
   } catch (err) {
-    console.error('[analyze] text analysis failed:', sanitizeLogText(err));
-    if (err instanceof Error && err.name === 'AnalysisParseError') {
-      return error(500, 'analysis_parse_failed');
+    console.error("[analyze] text analysis failed:", sanitizeLogText(err));
+    if (err instanceof Error && err.name === "AnalysisParseError") {
+      return error(500, "analysis_parse_failed");
     }
-    return error(502, 'llm_failed');
+    return error(502, "llm_failed");
   } finally {
     scheduleTmpVideoDelete(prepared.input?.tmpVideoId);
     // 注意：这行赋值没有实际作用——上面每条路径都已经 return，函数已经结束，
     // 这里改变量值不会被任何地方读取到
-    attemptedVideoMode = 'none';
+    attemptedVideoMode = "none";
   }
 }

@@ -50,9 +50,7 @@ function parsePositiveNumber(value, fallback) {
 
 function buildEndpoint(baseUrl) {
   const normalized = baseUrl.replace(/\/+$/, "");
-  return normalized.endsWith("/chat/completions")
-    ? normalized
-    : `${normalized}/chat/completions`;
+  return normalized.endsWith("/chat/completions") ? normalized : `${normalized}/chat/completions`;
 }
 
 function validateHttpUrl(rawUrl) {
@@ -68,10 +66,7 @@ function validateHttpUrl(rawUrl) {
   }
 
   if (url.protocol !== "http:" && url.protocol !== "https:") {
-    throw new DemoError(
-      "invalid_public_url",
-      "QWEN_VIDEO_PUBLIC_URL must use http or https.",
-    );
+    throw new DemoError("invalid_public_url", "QWEN_VIDEO_PUBLIC_URL must use http or https.");
   }
 
   return url.toString();
@@ -99,27 +94,18 @@ async function validateLocalVideoPath(filePath) {
 
   const stats = await stat(absolutePath);
   if (!stats.isFile()) {
-    throw new DemoError(
-      "local_file_not_file",
-      `Local video path is not a file: ${absolutePath}`,
-    );
+    throw new DemoError("local_file_not_file", `Local video path is not a file: ${absolutePath}`);
   }
 
   if (stats.size === 0) {
-    throw new DemoError(
-      "local_file_empty",
-      `Local video file is empty: ${absolutePath}`,
-    );
+    throw new DemoError("local_file_empty", `Local video file is empty: ${absolutePath}`);
   }
 
   return { absolutePath, size: stats.size };
 }
 
 function detectMimeType(filePath) {
-  return (
-    MIME_BY_EXTENSION.get(path.extname(filePath).toLowerCase()) ||
-    DEFAULT_MIME_TYPE
-  );
+  return MIME_BY_EXTENSION.get(path.extname(filePath).toLowerCase()) || DEFAULT_MIME_TYPE;
 }
 
 async function buildBase64VideoUrl(filePath, size) {
@@ -320,9 +306,7 @@ function normalizeModelResult(value) {
         }))
       : [],
     productSignals: Array.isArray(value?.productSignals)
-      ? value.productSignals
-          .filter((signal) => typeof signal === "string")
-          .slice(0, 6)
+      ? value.productSignals.filter((signal) => typeof signal === "string").slice(0, 6)
       : [],
   };
 }
@@ -385,8 +369,7 @@ async function run() {
       const urlAttemptError = summarizeError(urlError);
 
       try {
-        const { absolutePath, size } =
-          await validateLocalVideoPath(localPathArg);
+        const { absolutePath, size } = await validateLocalVideoPath(localPathArg);
         const base64Url = await buildBase64VideoUrl(absolutePath, size);
         const modelResult = await callQwen({ config, videoUrl: base64Url });
         return successResult("base64", modelResult, urlAttemptError);

@@ -1,10 +1,10 @@
-import { createHash, randomBytes } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
-import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
-import net from 'node:net';
-import path from 'node:path';
+import { createHash, randomBytes } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import net from "node:net";
+import path from "node:path";
 
-const DEFAULT_TMP_DIR = '/tmp/tiktranslate-analysis-videos';
+const DEFAULT_TMP_DIR = "/tmp/tiktranslate-analysis-videos";
 // TTL 决定文件何时被视为“过期”（过期后不可访问、可被清理）；
 // DELETE_DELAY 是另一个独立的定时器，在一次分析请求用完视频后延迟删除文件，两者用途不同，不要合并
 const TMP_VIDEO_TTL_MS = 30 * 60 * 1000;
@@ -14,19 +14,19 @@ const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
 const MAX_REDIRECTS = 2;
 
 export type VideoFallbackReason =
-  | 'no_video_input'
-  | 'invalid_video_url'
-  | 'test_video_url_invalid'
-  | 'public_app_url_missing'
-  | 'public_app_url_invalid'
-  | 'video_download_failed'
-  | 'video_too_large'
-  | 'tmp_video_url_unavailable'
-  | 'qwen_video_failed'
-  | 'qwen_video_json_parse_failed'
-  | 'qwen_video_not_observed';
+  | "no_video_input"
+  | "invalid_video_url"
+  | "test_video_url_invalid"
+  | "public_app_url_missing"
+  | "public_app_url_invalid"
+  | "video_download_failed"
+  | "video_too_large"
+  | "tmp_video_url_unavailable"
+  | "qwen_video_failed"
+  | "qwen_video_json_parse_failed"
+  | "qwen_video_not_observed";
 
-export type VideoInputMode = 'test_url' | 'server_tmp_url' | 'none';
+export type VideoInputMode = "test_url" | "server_tmp_url" | "none";
 
 export interface TmpVideoMeta {
   id: string;
@@ -40,7 +40,7 @@ export interface TmpVideoMeta {
 
 export interface PreparedVideoInput {
   url: string;
-  mode: Exclude<VideoInputMode, 'none'>;
+  mode: Exclude<VideoInputMode, "none">;
   tmpVideoId?: string;
 }
 
@@ -49,7 +49,7 @@ export class TmpVideoError extends Error {
 
   constructor(reason: VideoFallbackReason, message: string) {
     super(message);
-    this.name = 'TmpVideoError';
+    this.name = "TmpVideoError";
     this.reason = reason;
   }
 }
@@ -62,17 +62,17 @@ function getTmpRoot() {
 // 如果不过滤就直接 fetch，攻击者可以让服务器去请求内网地址（如云厂商的元数据接口）。
 // 不要为了“简化”而删减这些网段判断。
 function isLocalhost(hostname: string) {
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  return host === 'localhost' || host.endsWith('.localhost');
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  return host === "localhost" || host.endsWith(".localhost");
 }
 
 function isBlockedIp(hostname: string) {
-  const host = hostname.replace(/^\[|\]$/g, '');
+  const host = hostname.replace(/^\[|\]$/g, "");
   const ipVersion = net.isIP(host);
   if (ipVersion === 0) return false;
 
   if (ipVersion === 4) {
-    const parts = host.split('.').map((part) => Number.parseInt(part, 10));
+    const parts = host.split(".").map((part) => Number.parseInt(part, 10));
     const [a, b] = parts;
     // 依次屏蔽：0.x（本网段）、10.x/172.16-31.x/192.168.x（私有网段 RFC1918）、
     // 127.x（回环）、100.64-127.x（运营商级 NAT）、169.254.x（链路本地）
@@ -89,11 +89,11 @@ function isBlockedIp(hostname: string) {
 
   const normalized = host.toLowerCase();
   return (
-    normalized === '::' ||
-    normalized === '::1' ||
-    normalized.startsWith('fc') ||
-    normalized.startsWith('fd') ||
-    normalized.startsWith('fe80:')
+    normalized === "::" ||
+    normalized === "::1" ||
+    normalized.startsWith("fc") ||
+    normalized.startsWith("fd") ||
+    normalized.startsWith("fe80:")
   );
 }
 
@@ -105,7 +105,7 @@ function parseHttpUrl(value: string) {
     return null;
   }
 
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+  if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   if (isLocalhost(url.hostname) || isBlockedIp(url.hostname)) return null;
   return url;
 }
@@ -115,48 +115,48 @@ export function getValidAnalysisTestVideoUrl() {
   if (!raw) return { url: null, reason: null as VideoFallbackReason | null };
 
   const parsed = parseHttpUrl(raw);
-  if (!parsed) return { url: null, reason: 'test_video_url_invalid' as const };
+  if (!parsed) return { url: null, reason: "test_video_url_invalid" as const };
   return { url: parsed.toString(), reason: null };
 }
 
 export function getValidPublicAppOrigin() {
   const raw = process.env.PUBLIC_APP_URL?.trim();
-  if (!raw) return { origin: null, reason: 'public_app_url_missing' as const };
+  if (!raw) return { origin: null, reason: "public_app_url_missing" as const };
 
   let parsed: URL;
   try {
     parsed = new URL(raw);
   } catch {
-    return { origin: null, reason: 'public_app_url_invalid' as const };
+    return { origin: null, reason: "public_app_url_invalid" as const };
   }
 
-  const hasPath = parsed.pathname !== '' && parsed.pathname !== '/';
+  const hasPath = parsed.pathname !== "" && parsed.pathname !== "/";
   if (
-    (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') ||
+    (parsed.protocol !== "http:" && parsed.protocol !== "https:") ||
     hasPath ||
     parsed.search ||
     parsed.hash ||
     isLocalhost(parsed.hostname) ||
     isBlockedIp(parsed.hostname)
   ) {
-    return { origin: null, reason: 'public_app_url_invalid' as const };
+    return { origin: null, reason: "public_app_url_invalid" as const };
   }
 
   return { origin: parsed.origin, reason: null };
 }
 
 function sourceUrlHash(url: string) {
-  return createHash('sha256').update(url).digest('hex');
+  return createHash("sha256").update(url).digest("hex");
 }
 
 // 边接收边写盘、边累加字节数——不能只信 Content-Length 头（可能缺失或被伪造），
 // 必须在下载过程中实时判断，超限就立刻中止连接，防止恶意大文件把磁盘写满
 async function writeResponseBodyToFile(res: Response, filePath: string) {
   if (!res.body) {
-    throw new TmpVideoError('video_download_failed', 'download response body is empty');
+    throw new TmpVideoError("video_download_failed", "download response body is empty");
   }
 
-  const writer = createWriteStream(/* turbopackIgnore: true */ filePath, { flags: 'wx' });
+  const writer = createWriteStream(/* turbopackIgnore: true */ filePath, { flags: "wx" });
   const reader = res.body.getReader();
   let total = 0;
 
@@ -169,7 +169,7 @@ async function writeResponseBodyToFile(res: Response, filePath: string) {
       total += value.byteLength;
       if (total > MAX_VIDEO_BYTES) {
         await reader.cancel().catch(() => undefined);
-        throw new TmpVideoError('video_too_large', 'downloaded video exceeded size limit');
+        throw new TmpVideoError("video_too_large", "downloaded video exceeded size limit");
       }
 
       await new Promise<void>((resolve, reject) => {
@@ -181,7 +181,7 @@ async function writeResponseBodyToFile(res: Response, filePath: string) {
     }
 
     await new Promise<void>((resolve, reject) => {
-      writer.once('error', reject);
+      writer.once("error", reject);
       writer.end(resolve);
     });
   } catch (err) {
@@ -195,59 +195,68 @@ async function writeResponseBodyToFile(res: Response, filePath: string) {
 // 用 redirect: 'manual' 而不是默认的 'follow'，是因为要对每一跳重定向目标重新做 SSRF 校验；
 // 如果让 fetch 自动跟随重定向，攻击者可以先给一个安全的 URL 通过校验，
 // 再 302 跳转到内网地址，直接绕过上面的 isBlockedIp 检查
-async function fetchDownloadableVideo(url: URL, redirectsRemaining = MAX_REDIRECTS): Promise<Response> {
+async function fetchDownloadableVideo(
+  url: URL,
+  redirectsRemaining = MAX_REDIRECTS,
+): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
 
   let res: Response;
   try {
     res = await fetch(url, {
-      redirect: 'manual',
+      redirect: "manual",
       signal: controller.signal,
-      cache: 'no-store',
+      cache: "no-store",
       headers: {
-        Accept: 'video/*,application/octet-stream;q=0.9,*/*;q=0.1',
+        Accept: "video/*,application/octet-stream;q=0.9,*/*;q=0.1",
       },
     });
   } catch (err) {
     clearTimeout(timer);
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new TmpVideoError('video_download_failed', 'video download timed out');
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new TmpVideoError("video_download_failed", "video download timed out");
     }
-    throw new TmpVideoError('video_download_failed', err instanceof Error ? err.message : 'video download failed');
+    throw new TmpVideoError(
+      "video_download_failed",
+      err instanceof Error ? err.message : "video download failed",
+    );
   }
   clearTimeout(timer);
 
   if (res.status >= 300 && res.status < 400) {
     if (redirectsRemaining <= 0) {
-      throw new TmpVideoError('video_download_failed', 'too many video download redirects');
+      throw new TmpVideoError("video_download_failed", "too many video download redirects");
     }
 
-    const location = res.headers.get('location');
+    const location = res.headers.get("location");
     if (!location) {
-      throw new TmpVideoError('video_download_failed', 'video download redirect missing location');
+      throw new TmpVideoError("video_download_failed", "video download redirect missing location");
     }
 
     const redirected = parseHttpUrl(new URL(location, url).toString());
     if (!redirected) {
-      throw new TmpVideoError('invalid_video_url', 'video download redirected to a blocked URL');
+      throw new TmpVideoError("invalid_video_url", "video download redirected to a blocked URL");
     }
 
     return fetchDownloadableVideo(redirected, redirectsRemaining - 1);
   }
 
   if (!res.ok) {
-    throw new TmpVideoError('video_download_failed', `video download status ${res.status}`);
+    throw new TmpVideoError("video_download_failed", `video download status ${res.status}`);
   }
 
-  const contentLength = Number.parseInt(res.headers.get('content-length') ?? '', 10);
+  const contentLength = Number.parseInt(res.headers.get("content-length") ?? "", 10);
   if (Number.isFinite(contentLength) && contentLength > MAX_VIDEO_BYTES) {
-    throw new TmpVideoError('video_too_large', 'video content-length exceeded size limit');
+    throw new TmpVideoError("video_too_large", "video content-length exceeded size limit");
   }
 
-  const contentType = res.headers.get('content-type')?.split(';')[0].trim().toLowerCase() || '';
-  if (!contentType.startsWith('video/') && contentType !== 'application/octet-stream') {
-    throw new TmpVideoError('video_download_failed', `unsupported video content type ${contentType || 'unknown'}`);
+  const contentType = res.headers.get("content-type")?.split(";")[0].trim().toLowerCase() || "";
+  if (!contentType.startsWith("video/") && contentType !== "application/octet-stream") {
+    throw new TmpVideoError(
+      "video_download_failed",
+      `unsupported video content type ${contentType || "unknown"}`,
+    );
   }
 
   return res;
@@ -256,28 +265,31 @@ async function fetchDownloadableVideo(url: URL, redirectsRemaining = MAX_REDIREC
 function selectVideoCandidates(videoUrls: unknown, videoIndex: unknown) {
   if (!Array.isArray(videoUrls)) return [];
 
-  const index = typeof videoIndex === 'number' && Number.isInteger(videoIndex) ? videoIndex : 0;
+  const index = typeof videoIndex === "number" && Number.isInteger(videoIndex) ? videoIndex : 0;
   const ordered = [
     videoUrls[index],
     ...videoUrls.filter((_, itemIndex) => itemIndex !== index),
-  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 
   return [...new Set(ordered.map((value) => value.trim()))].slice(0, 3);
 }
 
-async function createTmpVideoFromSource(sourceUrl: string, publicOrigin: string): Promise<PreparedVideoInput> {
+async function createTmpVideoFromSource(
+  sourceUrl: string,
+  publicOrigin: string,
+): Promise<PreparedVideoInput> {
   const parsed = parseHttpUrl(sourceUrl);
   if (!parsed) {
-    throw new TmpVideoError('invalid_video_url', 'video URL is invalid or blocked');
+    throw new TmpVideoError("invalid_video_url", "video URL is invalid or blocked");
   }
 
   // id 只是文件目录名（会出现在 URL 路径里），token 才是真正的访问凭证（放在 query 里）；
   // 两者分开是为了防止别人靠猜 id 就能读到视频——必须同时拿到 token 才行
-  const id = randomBytes(16).toString('hex');
-  const token = randomBytes(32).toString('hex');
+  const id = randomBytes(16).toString("hex");
+  const token = randomBytes(32).toString("hex");
   const root = getTmpRoot();
   const dir = path.join(/* turbopackIgnore: true */ root, id);
-  const fileName = 'video.bin';
+  const fileName = "video.bin";
   const filePath = path.join(/* turbopackIgnore: true */ dir, fileName);
 
   await mkdir(/* turbopackIgnore: true */ root, { recursive: true });
@@ -291,7 +303,7 @@ async function createTmpVideoFromSource(sourceUrl: string, publicOrigin: string)
     const meta: TmpVideoMeta = {
       id,
       token,
-      mimeType: res.headers.get('content-type')?.split(';')[0].trim() || 'video/mp4',
+      mimeType: res.headers.get("content-type")?.split(";")[0].trim() || "video/mp4",
       fileName,
       createdAt: new Date(now).toISOString(),
       expiresAt: new Date(now + TMP_VIDEO_TTL_MS).toISOString(),
@@ -299,28 +311,37 @@ async function createTmpVideoFromSource(sourceUrl: string, publicOrigin: string)
     };
 
     await writeFile(
-      /* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir, 'meta.json'),
+      /* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dir, "meta.json"),
       JSON.stringify(meta, null, 2),
-      'utf8',
+      "utf8",
     );
 
     return {
       url: `${publicOrigin}/api/tmp-video/${id}?token=${token}`,
-      mode: 'server_tmp_url',
+      mode: "server_tmp_url",
       tmpVideoId: id,
     };
   } catch (err) {
-    await rm(/* turbopackIgnore: true */ dir, { recursive: true, force: true }).catch(() => undefined);
+    await rm(/* turbopackIgnore: true */ dir, { recursive: true, force: true }).catch(
+      () => undefined,
+    );
     throw err;
   }
 }
 
-export async function prepareServerTmpVideo(videoUrls: unknown, videoIndex: unknown, publicOrigin: string) {
+export async function prepareServerTmpVideo(
+  videoUrls: unknown,
+  videoIndex: unknown,
+  publicOrigin: string,
+) {
   await cleanupExpiredTmpVideos();
 
   const candidates = selectVideoCandidates(videoUrls, videoIndex);
   if (candidates.length === 0) {
-    throw new TmpVideoError('invalid_video_url', 'request did not include any video URL candidates');
+    throw new TmpVideoError(
+      "invalid_video_url",
+      "request did not include any video URL candidates",
+    );
   }
 
   let sawValidCandidate = false;
@@ -328,7 +349,7 @@ export async function prepareServerTmpVideo(videoUrls: unknown, videoIndex: unkn
 
   for (const candidate of candidates) {
     if (!parseHttpUrl(candidate)) {
-      lastError = new TmpVideoError('invalid_video_url', 'video URL is invalid or blocked');
+      lastError = new TmpVideoError("invalid_video_url", "video URL is invalid or blocked");
       continue;
     }
 
@@ -338,18 +359,26 @@ export async function prepareServerTmpVideo(videoUrls: unknown, videoIndex: unkn
     } catch (err) {
       if (err instanceof TmpVideoError) {
         lastError = err;
-        if (err.reason === 'video_too_large') throw err;
+        if (err.reason === "video_too_large") throw err;
         continue;
       }
-      lastError = new TmpVideoError('video_download_failed', err instanceof Error ? err.message : 'video download failed');
+      lastError = new TmpVideoError(
+        "video_download_failed",
+        err instanceof Error ? err.message : "video download failed",
+      );
     }
   }
 
   if (!sawValidCandidate) {
-    throw new TmpVideoError('invalid_video_url', lastError?.message ?? 'all video URL candidates were invalid');
+    throw new TmpVideoError(
+      "invalid_video_url",
+      lastError?.message ?? "all video URL candidates were invalid",
+    );
   }
 
-  throw lastError ?? new TmpVideoError('video_download_failed', 'all video download candidates failed');
+  throw (
+    lastError ?? new TmpVideoError("video_download_failed", "all video download candidates failed")
+  );
 }
 
 export async function readTmpVideoMeta(id: string) {
@@ -358,16 +387,16 @@ export async function readTmpVideoMeta(id: string) {
   if (!/^[a-f0-9]{32}$/.test(id)) return null;
 
   try {
-    const metaPath = path.join(/* turbopackIgnore: true */ getTmpRoot(), id, 'meta.json');
-    const raw = await readFile(/* turbopackIgnore: true */ metaPath, 'utf8');
+    const metaPath = path.join(/* turbopackIgnore: true */ getTmpRoot(), id, "meta.json");
+    const raw = await readFile(/* turbopackIgnore: true */ metaPath, "utf8");
     const parsed = JSON.parse(raw) as Partial<TmpVideoMeta>;
 
     if (
       parsed.id !== id ||
-      typeof parsed.token !== 'string' ||
-      typeof parsed.mimeType !== 'string' ||
-      typeof parsed.fileName !== 'string' ||
-      typeof parsed.expiresAt !== 'string'
+      typeof parsed.token !== "string" ||
+      typeof parsed.mimeType !== "string" ||
+      typeof parsed.fileName !== "string" ||
+      typeof parsed.expiresAt !== "string"
     ) {
       return null;
     }
@@ -402,23 +431,27 @@ export async function cleanupExpiredTmpVideos() {
     return;
   }
 
-  await Promise.all(entries.map(async (entry) => {
-    const dir = path.join(/* turbopackIgnore: true */ root, entry);
-    const meta = await readTmpVideoMeta(entry);
-    if (!meta || Date.parse(meta.expiresAt) <= Date.now()) {
-      await rm(/* turbopackIgnore: true */ dir, { recursive: true, force: true }).catch(() => undefined);
-    }
-  }));
+  await Promise.all(
+    entries.map(async (entry) => {
+      const dir = path.join(/* turbopackIgnore: true */ root, entry);
+      const meta = await readTmpVideoMeta(entry);
+      if (!meta || Date.parse(meta.expiresAt) <= Date.now()) {
+        await rm(/* turbopackIgnore: true */ dir, { recursive: true, force: true }).catch(
+          () => undefined,
+        );
+      }
+    }),
+  );
 }
 
 export function scheduleTmpVideoDelete(id: string | undefined) {
   if (!id || !/^[a-f0-9]{32}$/.test(id)) return;
 
   const timer = setTimeout(() => {
-    void rm(
-      /* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ getTmpRoot(), id),
-      { recursive: true, force: true },
-    ).catch(() => undefined);
+    void rm(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ getTmpRoot(), id), {
+      recursive: true,
+      force: true,
+    }).catch(() => undefined);
   }, TMP_VIDEO_DELETE_DELAY_MS);
 
   // unref 让这个定时器不阻塞 Node 进程退出——否则进程要等 5 分钟才能优雅关闭
